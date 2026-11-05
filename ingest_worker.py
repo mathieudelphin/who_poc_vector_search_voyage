@@ -10,6 +10,7 @@ Implements the 7-step ingestion flow for Open edX courses into MongoDB Atlas (`g
 
 import asyncio
 import hashlib
+import io
 import logging
 import re
 import time
@@ -18,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from bs4 import BeautifulSoup
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pypdf import PdfReader
 
 from db import ensure_indexes, get_db, get_modulestore_db
 
@@ -41,7 +43,7 @@ SKIPPED_BLOCK_TYPES = {
     "drag-and-drop-v2",
     "openassessment",
 }
-ALLOWED_BLOCK_TYPES = {"html", "about"}
+ALLOWED_BLOCK_TYPES = {"html", "about", "gridfs_pdf"}
 
 # Target ~300-400 tokens (~220-320 words) per chunk when splitting long sections
 MAX_WORDS_PER_CHUNK = 300
@@ -643,6 +645,16 @@ async def extract_course_payload_from_modulestore(
                         }
                     )
 
+    # Also extract any PDF course assets stored in Open edX GridFS (`fs.files` + `fs.chunks`)
+    pdf_blocks = await extract_pdf_blocks_from_gridfs(
+        org=org,
+        course_num=course_num,
+        run=run,
+        course_id=course_id,
+        modulestore_db=modulestore_db,
+    )
+    extracted_blocks.extend(pdf_blocks)
+
     return {
         "course_id": course_id,
         "short_code": short_code,
@@ -652,6 +664,84 @@ async def extract_course_payload_from_modulestore(
         "blocks": extracted_blocks,
         "source_database": "openedx_ulmo",
     }
+
+
+async def extract_pdf_blocks_from_gridfs(
+    org: str,
+    course_num: str,
+    run: str,
+    course_id: str,
+    modulestore_db: AsyncIOMotorDatabase,
+) -> List[Dict[str, Any]]:
+    """
+    Extract text from PDF handouts, checklists, glossaries, and lecture transcripts
+    stored in Open edX MongoContentStore GridFS (`openedx_ulmo.fs.files` + `fs.chunks`).
+    """
+    pdf_blocks: List[Dict[str, Any]] = []
+    try:
+        cursor = modulestore_db["fs.files"].find(
+            {
+                "contentType": "application/pdf",
+                "content_son.org": org,
+                "content_son.course": course_num,
+                "content_son.run": run,
+            }
+        ).sort("_id", 1)
+        pdf_files = await cursor.to_list(100)
+    except Exception as exc:
+        logger.warning("Could not query GridFS fs.files for %s (%s)", course_id, exc)
+        return []
+
+    for idx, pdf_doc in enumerate(pdf_files, 1):
+        try:
+            file_id = pdf_doc["_id"]
+            c_son = pdf_doc.get("content_son") or {}
+            asset_name = c_son.get("name") or str(file_id).split("@")[-1]
+            display_name = pdf_doc.get("displayname") or asset_name
+
+            chunks_cursor = (
+                modulestore_db["fs.chunks"]
+                .find({"files_id": file_id})
+                .sort("n", 1)
+            )
+            raw_chunks = await chunks_cursor.to_list(200)
+            if not raw_chunks:
+                continue
+
+            raw_bytes = b"".join(c.get("data", b"") for c in raw_chunks)
+            if not raw_bytes:
+                continue
+
+            reader = PdfReader(io.BytesIO(raw_bytes))
+            html_parts: List[str] = []
+            for page_idx, page in enumerate(reader.pages, 1):
+                page_text = re.sub(r"\s+", " ", (page.extract_text() or "").strip())
+                if not page_text:
+                    continue
+                html_parts.append(
+                    f"<h3>{display_name} — Page {page_idx}</h3><p>{page_text}</p>"
+                )
+
+            if not html_parts:
+                continue
+
+            safe_slug = re.sub(r"[^A-Za-z0-9]", "", asset_name)[:8].lower()
+            unit_code = f"pdf{idx:02d}{safe_slug[:4]}"
+            pdf_blocks.append(
+                {
+                    "block_id": f"gridfs_pdf_{idx:02d}_{safe_slug}",
+                    "unit_code": unit_code,
+                    "block_type": "gridfs_pdf",
+                    "section": "Course PDF Resources (GridFS)",
+                    "unit_title": f"PDF: {display_name}",
+                    "url": f"/{file_id}" if not str(file_id).startswith("/") else str(file_id),
+                    "html": "\n".join(html_parts),
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to parse GridFS PDF %s (%s)", pdf_doc.get("_id"), exc)
+
+    return pdf_blocks
 
 
 async def run_all_seed_ingestions(

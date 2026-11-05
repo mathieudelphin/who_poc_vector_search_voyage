@@ -143,11 +143,11 @@ EXTENDED_BENCHMARK_SUITE: List[Dict[str, Any]] = DEFAULT_BENCHMARK_SUITE[:3] + [
         "expect_blocked_or_not_found": False,
     },
     {
-        "test_id": "TC7_ethics_cioms_ich_e6_guidelines",
-        "category": "Regulatory Code Lookup (H0140EN Research Ethics Part 2)",
-        "question": "Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?",
-        "expected_chunk_id": "H0140EN2025Q4-48908a5fb5-c01",
-        "expected_course_id": "course-v1:WHOA+H0140EN+2025_Q4",
+        "test_id": "TC7_gridfs_pdf_gsed_competency_checklist",
+        "category": "GridFS PDF Handout Retrieval (Reranker Promotes PDF Content Over HTML Link Page)",
+        "question": "According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?",
+        "expected_chunk_id": "H0117EN2025Q1-pdf01gsed-c01",
+        "expected_course_id": "course-v1:WHOA+H0117EN+2025_Q1",
         "expect_blocked_or_not_found": False,
     },
     {

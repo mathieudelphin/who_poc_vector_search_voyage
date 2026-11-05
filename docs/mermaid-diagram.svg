@@ -1,0 +1,271 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2032.0033749999996 2553.219" width="2032.0033749999996" height="2553.219" style="--bg:#18181B;--fg:#F4F4F5;--line:#71717A;--muted:#A1A1AA;--surface:#27272A;--border:#3F3F46;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="SourceDB" data-label="1. Open edX Split Modulestore Database (openedx_ulmo)">
+  <rect x="818.2531999999999" y="40" width="767.8219999999998" height="454.00000000000006" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="818.2531999999999" y="40" width="767.8219999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="830.2531999999999" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">1. Open edX Split Modulestore Database (openedx_ulmo)</text>
+</g>
+<g class="subgraph" data-id="Ingestion" data-label="2. Ingestion Worker (ingest_worker.py + db.py)">
+  <rect x="845.6701999999998" y="554" width="721.1389999999999" height="368.1" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="845.6701999999998" y="554" width="721.1389999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="857.6701999999998" y="568" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">2. Ingestion Worker (ingest_worker.py + db.py)</text>
+</g>
+<g class="subgraph" data-id="TargetDB" data-label="3. MongoDB Atlas RAG Database (poc-who — db.py: ensure_indexes())">
+  <rect x="232.58687499999974" y="1050.4" width="1689.8464999999999" height="229.60000000000002" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="232.58687499999974" y="1050.4" width="1689.8464999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="244.58687499999974" y="1064.4" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">3. MongoDB Atlas RAG Database (poc-who — db.py: ensure_indexes())</text>
+</g>
+<g class="subgraph" data-id="Runtime" data-label="4. Live Q&amp;A Pipeline (main.py + rag_service.py + dashboard_ui.py)">
+  <rect x="40" y="1340" width="730.1789999999999" height="1147.2189999999998" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="1340" width="730.1789999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="1354" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">4. Live Q&amp;A Pipeline (main.py + rag_service.py + dashboard_ui.py)</text>
+</g>
+<polyline class="edge" data-from="DF" data-to="EX" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1030.1041999999998,478.00000000000006 1030.1042,536 1030.4747,536 1030.4746999999998,602.225" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="FS" data-to="PDF" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1389.4146999999998,478.00000000000006 1389.4146999999998,536 1389.0441999999998,536 1389.0441999999998,602.225" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SH" data-to="CH" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Upsert changed plain text" points="1119.5917499999998,906.1 1119.5917499999996,964.1 821.2286249999995,964.1 821.2286249999995,1032.4 534.9878749999993,1032.4 534.9878749999997,1098.6249999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SH" data-to="SR" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Update SHA-256" points="1179.7035499999997,906.1 1179.7035499999995,964.1 1174.0828749999996,964.1 1174.0828749999996,1032.4 1121.3403749999993,1032.4 1121.3403749999998,1098.6249999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SH" data-to="CS" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Upsert metadata" points="1239.8153499999999,906.1 1239.8153499999994,964.1 1281.4528749999995,964.1 1281.4528749999995,1032.4 1343.1953749999993,1032.4 1343.1953749999998,1098.6249999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SH" data-to="IR" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Log run" points="1299.9271499999998,906.1 1299.9271499999995,964.1 1426.6078749999997,964.1 1426.6078749999997,1032.4 1555.4173749999995,1032.4 1555.4173749999998,1098.6249999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="IDX_V" data-to="B4" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="389.2333749999997,1264 389.233375,1322.0000000000002 492.6015000000002,1322.0000000000002 492.6015,1774.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="IDX_T" data-to="B4" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="680.7423749999996,1264 680.7423749999998,1322.0000000000002 577.3742500000001,1322.0000000000002 577.37425,1774.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B6" data-to="CT" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Save Turn" points="631.3164999999999,2471.219 631.3164999999997,2505.219 1932.4333749999996,2505.219 1932.4333749999996,1032.4 1796.5383749999994,1032.4 1796.5383749999996,1098.6249999999998" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="AV" data-to="ST" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="A1: published-branch" points="1030.1041999999998,137.8 1030.1041999999998,254.10000000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="ST" data-to="DF" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="A2: definition ObjectId" points="1030.1041999999998,307.90000000000003 1030.1041999999998,424.20000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="EX" data-to="CL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1030.4746999999998,672.9250000000001 1030.4746999999998,694.8125 1209.7594499999996,694.8125 1209.7594499999996,716.7" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="PDF" data-to="CL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1389.0441999999998,656.025 1389.0441999999998,694.8125 1209.7594499999996,694.8125 1209.7594499999996,716.7" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="CL" data-to="SH" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1209.7594499999998,787.4 1209.7594499999998,835.4" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="CH" data-to="IDX_V" data-style="solid" data-arrow-start="false" data-arrow-end="false" points="534.9878749999997,1166.425 534.9878749999997,1188.3125 389.2333749999997,1188.3125 389.2333749999997,1210.2" fill="none" stroke="var(--_line)" stroke-width="1" />
+<polyline class="edge" data-from="CH" data-to="IDX_T" data-style="solid" data-arrow-start="false" data-arrow-end="false" points="534.9878749999997,1166.425 534.9878749999997,1188.3125 680.7423749999996,1188.3125 680.7423749999996,1210.2" fill="none" stroke="var(--_line)" stroke-width="1" />
+<polyline class="edge" data-from="UI" data-to="B1" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="290.51883333333325,1437.8 290.5188333333333,1485.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B1" data-to="B3" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="290.5188333333333,1539.6 290.5188333333333,1587.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B3" data-to="PROG" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="get_my_progress" points="253.26966666666664,1658.3 253.26966666666664,1670.3 175.52799999999996,1670.3 175.52799999999996,1774.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B3" data-to="B4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="search_course_content" points="327.7679999999999,1658.3 327.7679999999999,1670.3 405.5096666666666,1670.3 405.5096666666666,1738.6 407.8287499999999,1738.6 407.8287499999999,1774.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B4" data-to="B5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Top 8 Candidates" points="492.6014999999999,1845.3 492.60149999999993,1961.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B5" data-to="GATE" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="492.60149999999993,2015.4 492.60149999999993,2063.4" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="GATE" data-to="REFUSE" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="No (&lt; 0.50)" points="455.7983333333333,2247.4158333333335 455.7983333333333,2296.219 353.88649999999996,2296.219 353.8865,2400.519" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="GATE" data-to="B6" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Yes (Top 1-3 Chunks)" points="529.4046666666666,2247.4158333333335 529.4046666666666,2296.219 631.3164999999999,2296.219 631.3164999999999,2400.519" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="SH" data-to="CH" data-label="Upsert changed plain text">
+  <rect x="753.2286249999997" y="971.1000000000001" width="135.856" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="821.1566249999997" y="986.2500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Upsert changed plain text</text>
+</g>
+<g class="edge-label" data-from="SH" data-to="SR" data-label="Update SHA-256">
+  <rect x="1126.5828749999996" y="971.1000000000001" width="94.87" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1174.0178749999995" y="986.2500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Update SHA-256</text>
+</g>
+<g class="edge-label" data-from="SH" data-to="CS" data-label="Upsert metadata">
+  <rect x="1234.452875" y="971.1000000000001" width="93.08800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1280.996875" y="986.2500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Upsert metadata</text>
+</g>
+<g class="edge-label" data-from="SH" data-to="IR" data-label="Log run">
+  <rect x="1398.6078749999997" y="971.1000000000001" width="55.072" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1426.1438749999998" y="986.2500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Log run</text>
+</g>
+<g class="edge-label" data-from="B6" data-to="CT" data-label="Save Turn">
+  <rect x="1897.9333749999996" y="2467.919" width="68.14" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1932.0033749999996" y="2483.069" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Save Turn</text>
+</g>
+<g class="edge-label" data-from="AV" data-to="ST" data-label="A1: published-branch">
+  <rect x="972.1041999999999" y="180.8" width="115.06600000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1029.6372" y="195.95000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">A1: published-branch</text>
+</g>
+<g class="edge-label" data-from="ST" data-to="DF" data-label="A2: definition ObjectId">
+  <rect x="971.6041999999998" y="350.90000000000003" width="116.25400000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1029.7311999999997" y="366.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">A2: definition ObjectId</text>
+</g>
+<g class="edge-label" data-from="B3" data-to="PROG" data-label="get_my_progress">
+  <rect x="124.52799999999998" y="1701.3" width="101.99800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="175.527" y="1716.45" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">get_my_progress</text>
+</g>
+<g class="edge-label" data-from="B3" data-to="B4" data-label="search_course_content">
+  <rect x="339.0096666666666" y="1701.3" width="132.886" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="405.4526666666666" y="1716.45" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">search_course_content</text>
+</g>
+<g class="edge-label" data-from="B4" data-to="B5" data-label="Top 8 Candidates">
+  <rect x="442.6014999999999" y="1888.2999999999997" width="99.62200000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="492.4124999999999" y="1903.4499999999998" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Top 8 Candidates</text>
+</g>
+<g class="edge-label" data-from="GATE" data-to="REFUSE" data-label="No (&lt; 0.50)">
+  <rect x="320.38649999999996" y="2327.2189999999996" width="66.358" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="353.56549999999993" y="2342.3689999999997" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No (&lt; 0.50)</text>
+</g>
+<g class="edge-label" data-from="GATE" data-to="B6" data-label="Yes (Top 1-3 Chunks)">
+  <rect x="573.3164999999999" y="2327.2189999999996" width="115.066" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="630.8494999999999" y="2342.3689999999997" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Yes (Top 1-3 Chunks)</text>
+</g>
+<g class="node" data-id="AV" data-label="modulestore.active_versions
+(128 courses -&gt; published-branch ObjectId)" data-shape="rectangle">
+  <rect x="885.3821999999998" y="84" width="289.44399999999996" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1030.1041999999998" y="110.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1030.1041999999998" dy="-3.9000000000000012">modulestore.active_versions</tspan><tspan x="1030.1041999999998" dy="16.900000000000002">(128 courses -&gt; published-branch ObjectId)</tspan></text>
+</g>
+<g class="node" data-id="ST" data-label="modulestore.structures
+(153,885 version trees -&gt; reads ONLY 1 active published tree)" data-shape="rectangle">
+  <rect x="834.2531999999999" y="254.10000000000002" width="391.7019999999999" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1030.1041999999998" y="281" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1030.1041999999998" dy="-3.9000000000000012">modulestore.structures</tspan><tspan x="1030.1041999999998" dy="16.900000000000002">(153,885 version trees -&gt; reads ONLY 1 active published tree)</tspan></text>
+</g>
+<g class="node" data-id="DF" data-label="modulestore.definitions
+(91,867 blocks -&gt; 4,955 HTML lecture blocks)" data-shape="rectangle">
+  <rect x="879.4541999999999" y="424.20000000000005" width="301.29999999999995" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1030.1041999999998" y="451.1" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1030.1041999999998" dy="-3.9000000000000012">modulestore.definitions</tspan><tspan x="1030.1041999999998" dy="16.900000000000002">(91,867 blocks -&gt; 4,955 HTML lecture blocks)</tspan></text>
+</g>
+<g class="node" data-id="FS" data-label="fs.files &amp; fs.chunks (GridFS)
+(38 Course PDFs: Checklists, Glossaries, Transcripts)" data-shape="rectangle">
+  <rect x="1208.7541999999999" y="424.20000000000005" width="361.32099999999986" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1389.4146999999998" y="451.1" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1389.4146999999998" dy="-3.9000000000000012">fs.files &amp; fs.chunks (GridFS)</tspan><tspan x="1389.4146999999998" dy="16.900000000000002">(38 Course PDFs: Checklists, Glossaries, Transcripts)</tspan></text>
+</g>
+<g class="node" data-id="EX" data-label="A3a: extract_course_payload_from_modulestore()
+Walk Course &gt; Section &gt; Subsection &gt; Unit
+Skip graded 'problem' quizzes &amp; 'scorm'" data-shape="rectangle">
+  <rect x="861.6701999999998" y="602.225" width="337.6089999999999" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1030.4746999999998" y="637.575" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1030.4746999999998" dy="-12.350000000000001">A3a: extract_course_payload_from_modulestore()</tspan><tspan x="1030.4746999999998" dy="16.900000000000002">Walk Course &gt; Section &gt; Subsection &gt; Unit</tspan><tspan x="1030.4746999999998" dy="16.900000000000002">Skip graded &#39;problem&#39; quizzes &amp; &#39;scorm&#39;</tspan></text>
+</g>
+<g class="node" data-id="PDF" data-label="A3b: extract_pdf_blocks_from_gridfs()
+Read PDF bytes from fs.chunks + pypdf page text" data-shape="rectangle">
+  <rect x="1227.2791999999997" y="602.225" width="323.53" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1389.0441999999998" y="629.125" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1389.0441999999998" dy="-3.9000000000000012">A3b: extract_pdf_blocks_from_gridfs()</tspan><tspan x="1389.0441999999998" dy="16.900000000000002">Read PDF bytes from fs.chunks + pypdf page text</tspan></text>
+</g>
+<g class="node" data-id="CL" data-label="A4-A5: clean_html_preserving_headings()
+&amp; build_chunks_for_block()
+(~300 words + 'Course &gt; Section &gt; Unit' Breadcrumb)" data-shape="rectangle">
+  <rect x="1036.1384499999997" y="716.7" width="347.2419999999999" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1209.7594499999996" y="752.0500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1209.7594499999996" dy="-12.350000000000001">A4-A5: clean_html_preserving_headings()</tspan><tspan x="1209.7594499999996" dy="16.900000000000002">&amp; build_chunks_for_block()</tspan><tspan x="1209.7594499999996" dy="16.900000000000002">(~300 words + &#39;Course &gt; Section &gt; Unit&#39; Breadcrumb)</tspan></text>
+</g>
+<g class="node" data-id="SH" data-label="A6: ingest_course() + compute_sha256()
+Compare SHA-256 against poc-who.sources
+(Skip unchanged units = 0 writes)" data-shape="rectangle">
+  <rect x="1059.4799499999997" y="835.4" width="300.5589999999999" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1209.7594499999996" y="870.75" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="1209.7594499999996" dy="-12.350000000000001">A6: ingest_course() + compute_sha256()</tspan><tspan x="1209.7594499999996" dy="16.900000000000002">Compare SHA-256 against poc-who.sources</tspan><tspan x="1209.7594499999996" dy="16.900000000000002">(Skip unchanged units = 0 writes)</tspan></text>
+</g>
+<g class="node" data-id="CH" data-label="chunks (397 plain-text docs)
+348 HTML + 49 GridFS PDF chunks" data-shape="cylinder">
+  <rect x="409.1613749999997" y="1105.625" width="251.653" height="53.80000000000001" fill="var(--_node-fill)" stroke="none" />
+  <line x1="409.1613749999997" y1="1105.625" x2="409.1613749999997" y2="1159.425" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="660.8143749999997" y1="1105.625" x2="660.8143749999997" y2="1159.425" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="534.9878749999997" cy="1159.425" rx="125.8265" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="534.9878749999997" cy="1105.625" rx="125.8265" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="534.9878749999997" y="1132.525" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="534.9878749999997" dy="-3.9000000000000012">chunks (397 plain-text docs)</tspan><tspan x="534.9878749999997" dy="16.900000000000002">348 HTML + 49 GridFS PDF chunks</tspan></text>
+</g>
+<g class="node" data-id="SR" data-label="sources (292 SHA-256 hashes)" data-shape="cylinder">
+  <rect x="1008.4813749999996" y="1105.625" width="225.718" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="1008.4813749999996" y1="1105.625" x2="1008.4813749999996" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1234.1993749999997" y1="1105.625" x2="1234.1993749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1121.3403749999995" cy="1142.525" rx="112.859" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1121.3403749999995" cy="1105.625" rx="112.859" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1121.3403749999995" y="1124.075" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">sources (292 SHA-256 hashes)</text>
+</g>
+<g class="node" data-id="CS" data-label="courses (9 courses)" data-shape="cylinder">
+  <rect x="1262.1993749999997" y="1105.625" width="161.99200000000002" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="1262.1993749999997" y1="1105.625" x2="1262.1993749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1424.1913749999997" y1="1105.625" x2="1424.1913749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1343.1953749999998" cy="1142.525" rx="80.99600000000001" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1343.1953749999998" cy="1105.625" rx="80.99600000000001" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1343.1953749999998" y="1124.075" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">courses (9 courses)</text>
+</g>
+<g class="node" data-id="IR" data-label="ingest_runs (audit telemetry)" data-shape="cylinder">
+  <rect x="1452.1913749999997" y="1105.625" width="206.452" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="1452.1913749999997" y1="1105.625" x2="1452.1913749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1658.6433749999997" y1="1105.625" x2="1658.6433749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1555.4173749999995" cy="1142.525" rx="103.226" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1555.4173749999995" cy="1105.625" rx="103.226" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1555.4173749999995" y="1124.075" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">ingest_runs (audit telemetry)</text>
+</g>
+<g class="node" data-id="CT" data-label="chat_turns (30-day TTL index)" data-shape="cylinder">
+  <rect x="1686.6433749999997" y="1105.625" width="219.78999999999996" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="1686.6433749999997" y1="1105.625" x2="1686.6433749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="1906.4333749999996" y1="1105.625" x2="1906.4333749999996" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1796.5383749999996" cy="1142.525" rx="109.89499999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="1796.5383749999996" cy="1105.625" rx="109.89499999999998" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1796.5383749999996" y="1124.075" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">chat_turns (30-day TTL index)</text>
+</g>
+<g class="node" data-id="BR" data-label="benchmark_runs (benchmark_service.py)" data-shape="cylinder">
+  <rect x="688.8143749999997" y="1105.625" width="291.667" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="688.8143749999997" y1="1105.625" x2="688.8143749999997" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="980.4813749999996" y1="1105.625" x2="980.4813749999996" y2="1142.525" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="834.6478749999997" cy="1142.525" rx="145.8335" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="834.6478749999997" cy="1105.625" rx="145.8335" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="834.6478749999997" y="1124.075" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">benchmark_runs (benchmark_service.py)</text>
+</g>
+<g class="node" data-id="IDX_V" data-label="Atlas Vector Index: chunks_vector
+(A7: autoEmbed voyage-4 on chunks.text)" data-shape="rectangle">
+  <rect x="248.58687499999974" y="1210.2" width="281.29299999999995" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="389.2333749999997" y="1237.1000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="389.2333749999997" dy="-3.9000000000000012">Atlas Vector Index: chunks_vector</tspan><tspan x="389.2333749999997" dy="16.900000000000002">(A7: autoEmbed voyage-4 on chunks.text)</tspan></text>
+</g>
+<g class="node" data-id="IDX_T" data-label="Atlas Search Index: chunks_text
+(lucene.standard + course_id filter)" data-shape="rectangle">
+  <rect x="557.8798749999996" y="1210.2" width="245.72499999999994" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="680.7423749999996" y="1237.1000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="680.7423749999996" dy="-3.9000000000000012">Atlas Search Index: chunks_text</tspan><tspan x="680.7423749999996" dy="16.900000000000002">(lucene.standard + course_id filter)</tspan></text>
+</g>
+<g class="node" data-id="UI" data-label="Browser UI (dashboard_ui.py)
+POST /chat/stream (main.py)" data-shape="rectangle">
+  <rect x="181.36483333333325" y="1384" width="218.308" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="290.51883333333325" y="1410.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="290.51883333333325" dy="-3.9000000000000012">Browser UI (dashboard_ui.py)</tspan><tspan x="290.51883333333325" dy="16.900000000000002">POST /chat/stream (main.py)</tspan></text>
+</g>
+<g class="node" data-id="B1" data-label="B1-B2: resolve_learner_scope()
+&amp; load_recent_chat_turns()" data-shape="rectangle">
+  <rect x="176.1778333333333" y="1485.8" width="228.682" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="290.5188333333333" y="1512.7" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="290.5188333333333" dy="-3.9000000000000012">B1-B2: resolve_learner_scope()</tspan><tspan x="290.5188333333333" dy="16.900000000000002">&amp; load_recent_chat_turns()</tspan></text>
+</g>
+<g class="node" data-id="B3" data-label="B3: route_and_rewrite_query()
+Deterministic Intent Router
+(0 LLM Calls / 0 ms / $0.00)" data-shape="rectangle">
+  <rect x="178.7713333333333" y="1587.6" width="223.49499999999998" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="290.5188333333333" y="1622.9499999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="290.5188333333333" dy="-12.350000000000001">B3: route_and_rewrite_query()</tspan><tspan x="290.5188333333333" dy="16.900000000000002">Deterministic Intent Router</tspan><tspan x="290.5188333333333" dy="16.900000000000002">(0 LLM Calls / 0 ms / $0.00)</tspan></text>
+</g>
+<g class="node" data-id="PROG" data-label="Path B': get_my_progress()
+Return personal completion %
+(0 Vector Searches / 0 LLM Calls)" data-shape="rectangle">
+  <rect x="56" y="1774.6" width="239.05599999999995" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="175.52799999999996" y="1809.9499999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="175.52799999999996" dy="-12.350000000000001">Path B&#39;: get_my_progress()</tspan><tspan x="175.52799999999996" dy="16.900000000000002">Return personal completion %</tspan><tspan x="175.52799999999996" dy="16.900000000000002">(0 Vector Searches / 0 LLM Calls)</tspan></text>
+</g>
+<g class="node" data-id="B4" data-label="B4: hybrid_search_chunks()
+$rankFusion ($vectorSearch voyage-4 + $search)
+Pre-filtered by course_id IN enrolled_courses" data-shape="rectangle">
+  <rect x="323.0559999999999" y="1774.6" width="339.09099999999995" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="492.6014999999999" y="1809.9499999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="492.6014999999999" dy="-12.350000000000001">B4: hybrid_search_chunks()</tspan><tspan x="492.6014999999999" dy="16.900000000000002">$rankFusion ($vectorSearch voyage-4 + $search)</tspan><tspan x="492.6014999999999" dy="16.900000000000002">Pre-filtered by course_id IN enrolled_courses</tspan></text>
+</g>
+<g class="node" data-id="B5" data-label="B5: rerank_chunks()
+POST ai.mongodb.com/v1/rerank (rerank-3)" data-shape="rectangle">
+  <rect x="345.28599999999994" y="1961.6" width="294.631" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="492.60149999999993" y="1988.5" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="492.60149999999993" dy="-3.9000000000000012">B5: rerank_chunks()</tspan><tspan x="492.60149999999993" dy="16.900000000000002">POST ai.mongodb.com/v1/rerank (rerank-3)</tspan></text>
+</g>
+<g class="node" data-id="GATE" data-label="Relevance Score &gt;= 0.50?" data-shape="diamond">
+  <polygon points="492.6014999999999,2063.4 603.0109999999999,2173.8095000000003 492.6014999999999,2284.2190000000005 382.1919999999999,2173.8095000000003" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="492.6014999999999" y="2173.8095000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Relevance Score &gt;= 0.50?</text>
+</g>
+<g class="node" data-id="REFUSE" data-label="Safe Refusal (0 LLM Calls / $0.00):
+'Topic not found in enrolled courses'" data-shape="rectangle">
+  <rect x="227.31900000000002" y="2400.519" width="253.13499999999996" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="353.8865" y="2427.419" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="353.8865" dy="-3.9000000000000012">Safe Refusal (0 LLM Calls / $0.00):</tspan><tspan x="353.8865" dy="16.900000000000002">&#39;Topic not found in enrolled courses&#39;</tspan></text>
+</g>
+<g class="node" data-id="B6" data-label="B6-B7: stream_chat_answer()
+Single LLM Call (SSE Stream)
+with [S1], [S2] HTML &amp; PDF Citations" data-shape="rectangle">
+  <rect x="508.45399999999995" y="2400.519" width="245.7249999999999" height="70.7" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="631.3164999999999" y="2435.8689999999997" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="631.3164999999999" dy="-12.350000000000001">B6-B7: stream_chat_answer()</tspan><tspan x="631.3164999999999" dy="16.900000000000002">Single LLM Call (SSE Stream)</tspan><tspan x="631.3164999999999" dy="16.900000000000002">with [S1], [S2] HTML &amp; PDF Citations</tspan></text>
+</g>
+</svg>

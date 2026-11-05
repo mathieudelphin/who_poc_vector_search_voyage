@@ -612,6 +612,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <span class="preset-pill" onclick="setXrayQuestion('How is shock defined when poor perfusion prevents oxygen-carrying blood from reaching vital organs, and which age groups are most likely to be affected?')">Emergency Care (0006_BEC_EN): Shock vs Altered Mental Status</span>
           <span class="preset-pill" onclick="setXrayQuestion('Which 2023 WHO operational guidance document supports the Multisectoral Accountability Framework to end TB (MAF-TB)?')">TB Social Protection (HQ_SPTB_EN): MAF-TB 2023 Guidance</span>
           <span class="preset-pill" onclick="setXrayQuestion('Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?')">Research Ethics (H0140EN): CIOMS &amp; ICH E6(R3)</span>
+          <span class="preset-pill" onclick="setXrayQuestion('According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?')">PDF Handout (H0117EN GridFS): GSED Competency Checklist PDF</span>
+          <span class="preset-pill" onclick="setXrayQuestion('In the Ethical Integration of AI PDF module, what is required before collecting or using digital colposcopy images from data subjects?')">PDF Handout (H0118EN GridFS): Ethical AI &amp; Colposcopy Consent PDF</span>
           <span class="preset-pill" onclick="setXrayQuestion('How much of the course have I finished?')">Personal Progress: My Course Completion</span>
           <span class="preset-pill" onclick="setXrayQuestion('What is the BSL-4 positive-pressure suit chemical shower protocol for Ebola?')">Security Test: Un-Enrolled Course (BSL-4 Blocked)</span>
         </div>
@@ -831,11 +833,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                   <td><span class="badge">Full 10 Suite</span></td>
-                  <td><strong>TC7</strong> — Regulatory Code Lookup</td>
-                  <td><code>WHOA+H0140EN+2025_Q4</code><br/><span style="font-size:0.75rem;color:var(--text-muted);">Research Ethics Part 2</span></td>
-                  <td>Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?</td>
-                  <td><code>H0140EN2025Q4-48908a5fb5-c01</code></td>
-                  <td><button class="secondary" style="padding:0.35rem 0.65rem;font-size:0.76rem;" onclick="benchmarkSinglePreset('Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?')">Test 1Q</button></td>
+                  <td><strong>TC7</strong> — GridFS PDF Handout (Reranker Beats No-Reranker)</td>
+                  <td><code>WHOA+H0117EN+2025_Q1</code><br/><span style="font-size:0.75rem;color:var(--text-muted);">GridFS PDF Checklist</span></td>
+                  <td>According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?</td>
+                  <td><code>H0117EN2025Q1-pdf01gsed-c01</code></td>
+                  <td><button class="secondary" style="padding:0.35rem 0.65rem;font-size:0.76rem;" onclick="benchmarkSinglePreset('According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?')">Test 1Q</button></td>
                 </tr>
                 <tr>
                   <td><span class="badge">Full 10 Suite</span></td>
@@ -1032,16 +1034,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="profile-box pass">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
               <strong>1. WHO Good Practices for Clinical Trials</strong>
-              <span class="score-pill score-high">Enrolled (67 Chunks)</span>
+              <span class="score-pill score-high">Enrolled (HTML + 2 GridFS PDFs)</span>
             </div>
             <div style="font-size:0.76rem;color:var(--accent);margin:0.2rem 0 0.5rem;">
               Course ID: <code>course-v1:WHOA+H0118EN+Q1_2025</code>
             </div>
             <p style="font-size:0.84rem;color:var(--text);margin:0 0 0.55rem;">
-              Covers the <strong>2022 World Health Assembly resolution (WHA75.8)</strong>, how <strong>randomization and blinding</strong> prevent bias, why <strong>differential loss to follow-up</strong> distorts treatment outcomes, and how to <strong>communicate emerging safety information</strong> to participants and Data Monitoring Committees.
+              Covers the <strong>2022 World Health Assembly resolution (WHA75.8)</strong>, how <strong>randomization and blinding</strong> prevent bias, why <strong>differential loss to follow-up</strong> distorts treatment outcomes, and includes the GridFS PDF <strong><em>Ethical Integration of AI (Module 3 Unit 1)</em></strong>.
             </p>
             <div class="hit-item">
-              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant:</div>
+              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant (HTML &amp; PDF):</div>
               <div style="display:grid;gap:0.4rem;">
                 <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('What did the 2022 World Health Assembly resolution call for regarding clinical trials?')">
                   &rarr; "What did the 2022 World Health Assembly resolution call for regarding clinical trials?"
@@ -1049,8 +1051,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('Why does unequal participant dropout between study arms distort results?')">
                   &rarr; "Why does unequal participant dropout between study arms distort results?"
                 </button>
-                <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('When should new safety information be communicated to trial participants and regulatory bodies?')">
-                  &rarr; "When should new safety information be communicated to trial participants and regulatory bodies?"
+                <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('In the Ethical Integration of AI PDF module, what is required before collecting or using digital colposcopy images from data subjects?')">
+                  &rarr; [PDF] "In the Ethical Integration of AI PDF, what is required before collecting digital colposcopy images?"
                 </button>
               </div>
             </div>
@@ -1088,22 +1090,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="profile-box pass">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
               <strong>3. Global Scales for Early Development (GSED)</strong>
-              <span class="score-pill score-high">Enrolled (113 Chunks)</span>
+              <span class="score-pill score-high">Enrolled (HTML + 1 GridFS PDF)</span>
             </div>
             <div style="font-size:0.76rem;color:var(--accent);margin:0.2rem 0 0.5rem;">
               Course ID: <code>course-v1:WHOA+H0117EN+2025_Q1</code>
             </div>
             <p style="font-size:0.84rem;color:var(--text);margin:0 0 0.55rem;">
-              Explains how to assess child neurodevelopment (<strong>0 to 36 months</strong>) using the <strong>GSED Short Form (SF) caregiver questionnaire</strong> and the <strong>GSED tablet application</strong> built on the open-source <strong>Open Data Kit (ODK)</strong> platform for offline field data collection.
+              Explains how to assess child neurodevelopment (<strong>0 to 36 months</strong>) using the <strong>GSED Short Form (SF) caregiver questionnaire</strong>, the <strong>Open Data Kit (ODK)</strong> tablet app, and the GridFS PDF <strong><em>GSED SF Assessor Competency Checklist</em></strong>.
             </p>
             <div class="hit-item">
-              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant:</div>
+              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant (HTML &amp; PDF):</div>
               <div style="display:grid;gap:0.4rem;">
                 <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('What open-source platform is the GSED App built on for offline data collection on a tablet?')">
                   &rarr; "What open-source platform is the GSED App built on for offline data collection on a tablet?"
                 </button>
-                <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('What age range of children does the GSED Short Form assess and how is it administered?')">
-                  &rarr; "What age range of children does the GSED Short Form assess and how is it administered?"
+                <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?')">
+                  &rarr; [PDF] "According to the GSED Competency Checklist PDF, what general skills and tablet steps must an assessor show?"
                 </button>
               </div>
             </div>
@@ -1138,19 +1140,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="profile-box pass">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
               <strong>5. Research Ethics Online Training (Part 2)</strong>
-              <span class="score-pill score-high">Enrolled (16 Chunks)</span>
+              <span class="score-pill score-high">Enrolled (HTML + 14 GridFS PDFs)</span>
             </div>
             <div style="font-size:0.76rem;color:var(--accent);margin:0.2rem 0 0.5rem;">
               Course ID: <code>course-v1:WHOA+H0140EN+2025_Q4</code>
             </div>
             <p style="font-size:0.84rem;color:var(--text);margin:0 0 0.55rem;">
-              Covers Research Ethics Committee (REC) review of interventional clinical research, protecting participant safety and data integrity, <strong>CIOMS International Ethical Guidelines</strong>, the <strong>Singapore Statement on Research Integrity</strong>, and <strong>ICH E6 (R3) Good Clinical Practice (GCP)</strong>.
+              Covers Research Ethics Committee (REC) review of interventional clinical research, <strong>CIOMS International Ethical Guidelines</strong>, <strong>ICH E6 (R3) GCP</strong>, plus <strong>14 GridFS PDFs</strong> (Module 2 &amp; 3 Glossaries and 12 Video Lecture Transcripts).
             </p>
             <div class="hit-item">
-              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant:</div>
+              <div style="font-weight:600;color:var(--accent);margin-block-end:0.35rem;">Try Asking in Live Assistant (HTML &amp; PDF):</div>
               <div style="display:grid;gap:0.4rem;">
                 <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?')">
                   &rarr; "Which international ethical guidelines and ICH GCP revision are listed in Module 2 resources?"
+                </button>
+                <button class="secondary" style="text-align:start;font-size:0.78rem;padding:0.4rem 0.65rem;" onclick="askFromGuide('How does the Research Ethics Module 3 Glossary PDF define Accreditation and Quality Improvement (QA/QI) for a Research Ethics Committee?')">
+                  &rarr; [PDF] "How does the Module 3 Glossary PDF define Accreditation and QA/QI for a Research Ethics Committee?"
                 </button>
               </div>
             </div>

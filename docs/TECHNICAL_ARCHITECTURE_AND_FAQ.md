@@ -29,108 +29,120 @@ When WHO health workers and learners ask clinical or policy questions inside a c
 
 ## 2. UML Diagrams: From Open edX Modulestore (`openedx_ulmo`) to Learner Answer
 
-### A. UML Component & Data Flow Diagram (Ingestion + Retrieval)
+### A. UML Component & Data Flow Diagram (Ingestion Flow A + Runtime Flow B)
 
 ```mermaid
 flowchart TB
   subgraph SourceDB["1. Open edX Split Modulestore Database (openedx_ulmo)"]
-    AV["modulestore.active_versions<br/>(128 courses — points to published-branch)"]
-    ST["modulestore.structures<br/>(153,885 version trees — reads ONLY the 1 active published tree per course)"]
-    DF["modulestore.definitions<br/>(91,867 blocks — 4,955 raw HTML lecture blocks)"]
-    FS["fs.files & fs.chunks<br/>(38,275 GridFS binary docs — bypassed by RAG)"]
-    AV -->|published-branch ObjectId| ST
-    ST -->|definition ObjectId| DF
+    AV["modulestore.active_versions<br/>(128 courses -> published-branch ObjectId)"]
+    ST["modulestore.structures<br/>(153,885 version trees -> reads ONLY 1 active published tree)"]
+    DF["modulestore.definitions<br/>(91,867 blocks -> 4,955 HTML lecture blocks)"]
+    FS["fs.files & fs.chunks (GridFS)<br/>(38 Course PDFs: Checklists, Glossaries, Transcripts)"]
+    AV -->|A1: published-branch| ST
+    ST -->|A2: definition ObjectId| DF
   end
 
-  subgraph Ingestion["2. Delta Ingestion Worker (ingest_worker.py)"]
-    EX["Extract Published Course Tree<br/>(Section > Subsection > Unit)"]
-    CL["Clean HTML & Split at h2/h3<br/>(~400 words + 60-word overlap)"]
-    BC["Prepend Breadcrumb Header<br/>'Course: ... | Section: ... | Unit: ...'"]
-    SH["Compute SHA-256 Hash<br/>(Skip if unchanged in poc-who.sources)"]
-    DF --> EX --> CL --> BC --> SH
+  subgraph Ingestion["2. Ingestion Worker (ingest_worker.py + db.py)"]
+    EX["A3: extract_course_payload_from_modulestore()<br/>Walk Course > Section > Subsection > Unit<br/>Skip graded 'problem' quizzes & 'scorm'"]
+    PDF["A3b: extract_pdf_blocks_from_gridfs()<br/>Read PDF bytes from fs.chunks + pypdf page text"]
+    CL["A4-A5: clean_html_preserving_headings()<br/>& build_chunks_for_block()<br/>(~300 words + 'Course > Section > Unit' Breadcrumb)"]
+    SH["A6: ingest_course() + compute_sha256()<br/>Compare SHA-256 against poc-who.sources<br/>(Skip unchanged units = 0 writes)"]
+    DF --> EX
+    FS --> PDF
+    EX --> CL
+    PDF --> CL
+    CL --> SH
   end
 
-  subgraph TargetDB["3. MongoDB Atlas RAG Database (poc-who)"]
-    CH[("chunks (348 plain-text docs)<br/>No float[] vectors in Python!")]
-    SR[("sources (275 unit hashes)")]
+  subgraph TargetDB["3. MongoDB Atlas RAG Database (poc-who — db.py: ensure_indexes())"]
+    CH[("chunks (397 plain-text docs)<br/>348 HTML + 49 GridFS PDF chunks")]
+    SR[("sources (292 SHA-256 hashes)")]
     CS[("courses (9 courses)")]
-    CT[("chat_turns (30-day TTL)")]
-    BR[("benchmark_runs")]
-    IDX_V["Atlas Vector Index: chunks_vector<br/>(autoEmbed: voyage-4)"]
-    IDX_T["Atlas Search Index: chunks_text<br/>(lucene.standard)"]
+    IR[("ingest_runs (audit telemetry)")]
+    CT[("chat_turns (30-day TTL index)")]
+    BR[("benchmark_runs (benchmark_service.py)")]
+    IDX_V["Atlas Vector Index: chunks_vector<br/>(A7: autoEmbed voyage-4 on chunks.text)"]
+    IDX_T["Atlas Search Index: chunks_text<br/>(lucene.standard + course_id filter)"]
     SH -->|Upsert changed plain text| CH
-    SH -->|Update hash| SR
+    SH -->|Update SHA-256| SR
+    SH -->|Upsert metadata| CS
+    SH -->|Log run| IR
     CH --- IDX_V
     CH --- IDX_T
   end
 
-  subgraph Runtime["4. Live Answer Pipeline (rag_service.py)"]
-    Q["Learner Question + learner_id"]
-    RT["Step 1: Resolve Enrolled Courses<br/>& Instant Intent Router (0 LLM Calls / $0)"]
-    HY["Step 2: Pre-Filtered Hybrid Search<br/>($rankFusion over voyage-4 Vector + Text)"]
-    RR["Step 3: Voyage AI rerank-3<br/>(POST ai.mongodb.com/v1/rerank)"]
-    GT{"Best Score >= 0.50?"}
-    NF["Return Safe Refusal (0 LLM Calls):<br/>'Topic not found in enrolled courses'"]
-    GEN["Single LLM Call (SSE)<br/>with [S1], [S2] Unit Citations"]
+  subgraph Runtime["4. Live Q&A Pipeline (main.py + rag_service.py + dashboard_ui.py)"]
+    UI["Browser UI (dashboard_ui.py)<br/>POST /chat/stream (main.py)"]
+    B1["B1-B2: resolve_learner_scope()<br/>& load_recent_chat_turns()"]
+    B3["B3: route_and_rewrite_query()<br/>Deterministic Intent Router<br/>(0 LLM Calls / 0 ms / $0.00)"]
+    PROG["Path B': get_my_progress()<br/>Return personal completion %<br/>(0 Vector Searches / 0 LLM Calls)"]
+    B4["B4: hybrid_search_chunks()<br/>$rankFusion ($vectorSearch voyage-4 + $search)<br/>Pre-filtered by course_id IN enrolled_courses"]
+    B5["B5: rerank_chunks()<br/>POST ai.mongodb.com/v1/rerank (rerank-3)"]
+    GATE{"Relevance Score >= 0.50?"}
+    REFUSE["Safe Refusal (0 LLM Calls / $0.00):<br/>'Topic not found in enrolled courses'"]
+    B6["B6-B7: stream_chat_answer()<br/>Single LLM Call (SSE Stream)<br/>with [S1], [S2] HTML & PDF Citations"]
 
-    Q --> RT
-    RT -->|search_course_content| HY
-    IDX_V --> HY
-    IDX_T --> HY
-    HY -->|Top Candidates| RR
-    RR --> GT
-    GT -->|No (< 0.50)| NF
-    GT -->|Yes (Top 1-3 Chunks)| GEN
-    GEN -->|Save Turn| CT
+    UI --> B1 --> B3
+    B3 -->|get_my_progress| PROG
+    B3 -->|search_course_content| B4
+    IDX_V --> B4
+    IDX_T --> B4
+    B4 -->|Top 8 Candidates| B5
+    B5 --> GATE
+    GATE -->|No (< 0.50)| REFUSE
+    GATE -->|Yes (Top 1-3 Chunks)| B6
+    B6 -->|Save Turn| CT
   end
 ```
 
 ---
 
-### B. UML Sequence Diagram: End-to-End Runtime Flow
+### B. UML Sequence Diagram: End-to-End Runtime Flow (With Python Files & Steps)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor Learner as WHO Learner (Browser)
-  participant API as FastAPI Server (main.py)
-  participant Worker as Ingest Worker (ingest_worker.py)
-  participant Ulmo as Open edX DB (openedx_ulmo)
-  participant Atlas as Target RAG DB (poc-who)
-  participant Voyage as Voyage AI API (ai.mongodb.com)
-  participant Foundry as Azure AI Foundry / OpenAI (Step B6 Single LLM Call)
+  actor Learner as WHO Learner<br/>(dashboard_ui.py)
+  participant Main as FastAPI Server<br/>(main.py)
+  participant Ingest as Ingest Worker<br/>(ingest_worker.py)
+  participant DBMod as DB Setup<br/>(db.py)
+  participant Ulmo as Open edX DB<br/>(openedx_ulmo)
+  participant Atlas as Target RAG DB<br/>(poc-who)
+  participant Voyage as Voyage AI API<br/>(ai.mongodb.com)
+  participant LLM as Azure AI Foundry / OpenAI<br/>(Step B6 Single LLM Call)
 
   rect rgb(235, 245, 251)
-  Note over Worker,Atlas: PHASE 1 — Offline / Incremental Course Sync (Flow A)
-  Worker->>Ulmo: 1. Read modulestore.active_versions (get published-branch ID)
-  Worker->>Ulmo: 2. Read modulestore.structures (walk Section > Subsection > Unit)
-  Worker->>Ulmo: 3. Fetch HTML blocks from modulestore.definitions
-  Worker->>Worker: 4. Strip HTML tags, split at h2/h3, prepend Breadcrumb, compute SHA-256
-  Worker->>Atlas: 5. Compare SHA-256 against poc-who.sources (skip unchanged units!)
-  Worker->>Atlas: 6. Upsert plain-text chunks into poc-who.chunks
-  Atlas->>Voyage: 7. Atlas autoEmbed automatically generates voyage-4 vectors in background
+  Note over Ingest,Voyage: FLOW A — Course & GridFS PDF Delta Ingestion (ingest_worker.py + db.py)
+  Ingest->>DBMod: A0: ensure_indexes() -> verify chunks_vector (autoEmbed voyage-4) & chunks_text
+  Ingest->>Ulmo: A1-A2: extract_course_payload_from_modulestore() -> read active_versions & structures
+  Ingest->>Ulmo: A3a: Fetch published HTML blocks from modulestore.definitions (skip problem/video/scorm)
+  Ingest->>Ulmo: A3b: extract_pdf_blocks_from_gridfs() -> read PDFs from fs.files & fs.chunks (pypdf)
+  Ingest->>Ingest: A4-A5: clean_html_preserving_headings() + build_chunks_for_block() + compute_sha256()
+  Ingest->>Atlas: A6: ingest_course() -> compare SHA-256 vs poc-who.sources (skip unchanged units)
+  Ingest->>Atlas: A6: Upsert new/changed plain-text chunks into poc-who.chunks (397 total: 348 HTML + 49 PDF)
+  Atlas->>Voyage: A7: Atlas autoEmbed automatically generates voyage-4 embeddings in background
   end
 
   rect rgb(240, 249, 244)
-  Note over Learner,Foundry: PHASE 2 — Live Learner Question & Grounded Answer (Flow B — Single LLM Call)
-  Learner->>API: POST /chat/stream {learner_id, session_id, question}
-  API->>Atlas: Load verified enrolled_courses + last 3 turns from chat_turns
-  API->>API: B3: Instant Deterministic Intent Router (0 LLM calls, 0 ms, $0.00)
-  alt Learner asks about personal progress ("How much have I finished?")
-    API->>API: Tool: get_my_progress() (Path B' — bypasses Vector Search & LLM)
-    API-->>Learner: Stream personal completion % and next unit deadline (0 LLM calls)
-  else Learner asks a WHO course/clinical question
-    API->>Atlas: B4: Hybrid Search ($vectorSearch voyage-4 + $search) pre-filtered by enrolled_courses
-    Atlas-->>API: Return top candidate chunks
-    API->>Voyage: B5: POST /v1/rerank (model: "rerank-3", query, documents, top_k: 3)
-    Voyage-->>API: Return top 3 chunks with calibrated relevance_score (0.0 to 1.0)
-    alt All chunks score < 0.50 (Un-enrolled or off-topic)
-      API-->>Learner: SSE Answer: "This topic was not found in your enrolled courses." (0 LLM calls / $0.00)
+  Note over Learner,LLM: FLOW B — Live Learner Q&A Pipeline (main.py -> rag_service.py)
+  Learner->>Main: POST /chat/stream {learner_id, session_id, question}
+  Main->>Atlas: B1-B2: resolve_learner_scope() + load_recent_chat_turns() (rag_service.py)
+  Main->>Main: B3: route_and_rewrite_query() -> Deterministic Intent Router (0 LLM calls, 0 ms, $0.00)
+  alt Intent == get_my_progress ("How much of the course have I finished?")
+    Main->>Main: Path B': get_my_progress() (rag_service.py)
+    Main-->>Learner: SSE Stream: Personal course completion % (0 Vector Searches, 0 LLM Calls)
+  else Intent == search_course_content (Clinical / Course / PDF Question)
+    Main->>Atlas: B4: hybrid_search_chunks() -> $rankFusion ($vectorSearch voyage-4 + $search)<br/>Pre-filtered by course_id IN enrolled_courses & is_active=true
+    Atlas-->>Main: Return Top 8 candidate chunks (HTML + GridFS PDF)
+    Main->>Voyage: B5: rerank_chunks() -> POST /v1/rerank (model: "rerank-3", top_k: 3)
+    Voyage-->>Main: Return calibrated relevance_score (0.00 to 1.00)
+    alt All chunks score < 0.50 (Un-enrolled BSL-4 course or off-topic question)
+      Main-->>Learner: B6 (Cutoff Gate): Safe refusal "Topic not found in enrolled courses" (0 LLM calls / $0.00)
     else 1 to 3 chunks score >= 0.50
-      API->>Foundry: B6: Single LLM Call — Write grounded answer using ONLY [S1], [S2], [S3] chunks
-      Foundry-->>API: Stream grounded answer with [S1], [S2] citations
-      API-->>Learner: B7: SSE metadata + token stream + clickable Open edX Unit URLs
-      API->>Atlas: Persist turn in poc-who.chat_turns (30-day TTL)
+      Main->>LLM: B6: stream_chat_answer() -> Single LLM Call with surviving [S1], [S2] chunks
+      LLM-->>Main: Stream grounded tokens with [S1], [S2] citations
+      Main-->>Learner: B7: SSE metadata + token stream + clickable Open edX Unit / PDF URLs
+      Main->>Atlas: B7: Save turn to poc-who.chat_turns (30-day TTL index)
     end
   end
   end
@@ -157,8 +169,8 @@ In the Open edX Split Modulestore (`openedx_ulmo`) database:
 | Collection | Count | Purpose |
 | :--- | :---: | :--- |
 | **`courses`** | `9` | Course catalog metadata (`_id: "course-v1:WHOA+0006_BEC_EN+2026"`, `title`, `org`, `version`). |
-| **`sources`** | `275` | One document per Open edX lecture unit with its `sha256` hash for incremental delta sync. |
-| **`chunks`** | `348` | Clean plain-text chunks with `Course | Section | Unit` breadcrumb headers. Indexed by **`chunks_vector`** (`autoEmbed` `voyage-4`) and **`chunks_text`** (`lucene.standard`). |
+| **`sources`** | `292` | One document per Open edX lecture unit or GridFS PDF with its `sha256` hash for incremental delta sync. |
+| **`chunks`** | `397` | Clean plain-text chunks (`348` HTML chunks + `49` GridFS PDF chunks across `17` PDFs) with `Course | Section | Unit` breadcrumb headers. Indexed by **`chunks_vector`** (`autoEmbed` `voyage-4`) and **`chunks_text`** (`lucene.standard`). |
 | **`ingest_runs`** | `21+` | Telemetry log of each ingestion run (`sources_seen`, `sources_changed`, `chunks_upserted`). |
 | **`chat_turns`** | Dynamic | Learner Q&A history with citations, automatically cleaned up after 30 days via TTL index `idx_chat_turns_ttl`. |
 | **`benchmark_runs`** | Dynamic | Saved Voyage AI model benchmark runs from Tab 4. |
@@ -220,9 +232,9 @@ The project is organized into **6 modular Python files**:
 
 ## 6. Frequently Asked Questions (FAQ)
 
-### Q1: Why are only `html` blocks indexed from `modulestore.definitions`? What about `problem` (quizzes) and `video` blocks?
+### Q1: Why are `html` blocks and GridFS `application/pdf` files indexed while `problem` (quizzes) blocks are excluded?
 * **Excluding `problem` blocks (`7,875` docs):** In Open edX, `problem` blocks contain graded certification exam questions and answers. Excluding `block_type: "problem"` prevents learners from using the AI assistant to look up answers to graded WHO certification assessments.
-* **Adding `video` transcripts and PDFs:** Video transcripts (`.srt`/`.vtt`) and PDF handouts convert into plain-text chunks in the **same `poc-who.chunks` collection** (with deep links to the video timestamp), and Atlas `autoEmbed` embeds them automatically without changing search or reranking code.
+* **Indexing GridFS PDFs (`fs.files` + `fs.chunks`):** `extract_pdf_blocks_from_gridfs()` in [`ingest_worker.py`](../ingest_worker.py) reads course PDF handouts, competency checklists, glossaries, and transcripts directly from `openedx_ulmo.fs.files` and `fs.chunks` using `pypdf`, chunks them with page breadcrumbs, and writes plain text into the **same `poc-who.chunks` collection** (`49` PDF chunks across `H0118EN`, `H0117EN`, and `H0140EN`), where Atlas `autoEmbed` embeds them automatically.
 
 ### Q2: WHO operates in 6 official UN languages (EN, FR, ES, AR, ZH, RU). Does this architecture support multilingual courses?
 * Yes. `openedx_ulmo` contains courses in English, French, Spanish, Arabic, Chinese, Portuguese, and Russian.

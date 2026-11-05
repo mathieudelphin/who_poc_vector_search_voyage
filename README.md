@@ -21,11 +21,11 @@ Fill in your credentials in `.env`:
 - `VOYAGE_API_KEY` — MongoDB Atlas Model API key (`https://ai.mongodb.com/v1`)
 - `AZURE_OPENAI_API_KEY` / `OPENAI_API_KEY` — Azure AI Foundry or OpenAI API key for Step B6 grounded answer generation
 
-### Step 2 — Sync WHO Courses from Open edX Modulestore into RAG Chunks
+### Step 2 — Sync WHO Courses (HTML + GridFS PDFs) from Open edX Modulestore into RAG Chunks
 ```bash
 .venv/bin/python ingest_worker.py
 ```
-*Reads published WHO courses from `openedx_ulmo`, strips HTML tags, splits on `<h2>`/`<h3>` headings, prepends course/section/unit breadcrumbs, and writes plain-text chunks to `poc-who.chunks` (skipping unchanged units via SHA-256).*
+*Reads published WHO courses from `openedx_ulmo` (`modulestore.definitions` HTML blocks + `fs.files`/`fs.chunks` GridFS PDFs), strips HTML tags / extracts PDF page text via `pypdf`, prepends course/section/unit breadcrumbs, and writes plain-text chunks to `poc-who.chunks` (`397` chunks total: `348` HTML + `49` PDF chunks, skipping unchanged units via SHA-256).*
 
 ### Step 3 — Start the FastAPI Server & Open the Web Studio
 ```bash
@@ -115,8 +115,8 @@ flowchart LR
 | Collection | Docs | Key Fields & Purpose |
 | :--- | :---: | :--- |
 | **`courses`** | **9** | Course metadata (`_id`, `title`, `org`, `language`, `version`, `updated_at`). |
-| **`sources`** | **275** | Tracks each Open edX lecture unit (`_id`, `course_id`, `unit_title`, `section`, `url`, `sha256`, `status`) so unchanged units are skipped during incremental syncs. |
-| **`chunks`** | **348** | **Searchable Knowledge Base.** Stores plain-text chunks (`_id`, `course_id`, `section_title`, `text` with breadcrumb header, `url`, `sha256`, `is_active: true`). Indexed by `chunks_vector` (`autoEmbed` `voyage-4`) and `chunks_text` (`lucene.standard`). |
+| **`sources`** | **292** | Tracks each Open edX lecture unit and GridFS PDF (`_id`, `course_id`, `unit_title`, `section`, `url`, `sha256`, `status`) so unchanged units and PDFs are skipped during incremental syncs. |
+| **`chunks`** | **397** | **Searchable Knowledge Base (`348` HTML + `49` GridFS PDF chunks).** Stores plain-text chunks (`_id`, `course_id`, `section_title`, `text` with breadcrumb header, `url`, `sha256`, `is_active: true`). Indexed by `chunks_vector` (`autoEmbed` `voyage-4`) and `chunks_text` (`lucene.standard`). |
 | **`ingest_runs`** | **21+** | Audit log of each ingestion sync (`sources_seen`, `sources_changed`, `chunks_upserted`, `chunks_deactivated`). |
 | **`chat_turns`** | Dynamic | Stores learner Q&A turns (`session_id`, `learner_id`, `question`, `rewritten_query`, `answer`, `citations`, `created_at`). Expires automatically after **30 days** via TTL index `idx_chat_turns_ttl`. |
 | **`benchmark_runs`** | Dynamic | Stores model benchmark comparison matrices executed from Tab 3. |
