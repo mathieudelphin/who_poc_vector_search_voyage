@@ -164,16 +164,40 @@ In the Open edX Split Modulestore (`openedx_ulmo`) database:
 
 ---
 
-### B. Target RAG Database (`poc-who`)
+### B. Target RAG Database (`poc-who` — All 7 Collections Explained)
 
-| Collection | Count | Purpose |
-| :--- | :---: | :--- |
-| **`courses`** | `9` | Course catalog metadata (`_id: "course-v1:WHOA+0006_BEC_EN+2026"`, `title`, `org`, `version`). |
-| **`sources`** | `292` | One document per Open edX lecture unit or GridFS PDF with its `sha256` hash for incremental delta sync. |
-| **`chunks`** | `397` | Clean plain-text chunks (`348` HTML chunks + `49` GridFS PDF chunks across `17` PDFs) with `Course | Section | Unit` breadcrumb headers. Indexed by **`chunks_vector`** (`autoEmbed` `voyage-4`) and **`chunks_text`** (`lucene.standard`). |
-| **`ingest_runs`** | `21+` | Telemetry log of each ingestion run (`sources_seen`, `sources_changed`, `chunks_upserted`). |
-| **`chat_turns`** | Dynamic | Learner Q&A history with citations, automatically cleaned up after 30 days via TTL index `idx_chat_turns_ttl`. |
-| **`benchmark_runs`** | Dynamic | Saved Voyage AI model benchmark runs from Tab 4. |
+The `poc-who` database has **7 collections**, organized into **3 functional roles**:
+
+```mermaid
+flowchart LR
+  subgraph Role1["1. Knowledge Base & Delta Sync (ingest_worker.py)"]
+    CS[("courses (9)")]
+    SR[("sources (292)")]
+    CH[("chunks (397)")]
+    IR[("ingest_runs (audit log)")]
+  end
+
+  subgraph Role2["2. Live Learner Q&A History (rag_service.py)"]
+    SS[("chat_sessions")]
+    CT[("chat_turns (30-day TTL)")]
+  end
+
+  subgraph Role3["3. Accuracy & Cost Evaluation (benchmark_service.py)"]
+    BR[("benchmark_runs")]
+  end
+```
+
+#### Summary Cheat Sheet of All 7 Collections in `poc-who`
+
+| Collection in `poc-who` | Doc Count | Written / Read By | Indexes (`db.py`) | Purpose & How It Works |
+| :--- | :---: | :--- | :--- | :--- |
+| **`chunks`** | **`397`** (`348` HTML + `49` PDF) | Written by `ingest_worker.py`<br/>Searched by `rag_service.py` | • **`chunks_vector`** (`autoEmbed` `voyage-4` on `text`, filters: `course_id`, `is_active`)<br/>• **`chunks_text`** (`lucene.standard`, filters: `course_id`, `is_active`)<br/>• `idx_chunks_course_active` | **The Searchable Knowledge Base.** Stores ~300-word plain-text passages with `Course > Section > Unit` breadcrumb headers, clickable Open edX/PDF `url`, and `sha256` hash. **No `float[]` vector array in Python** — Atlas `autoEmbed` embeds `text` automatically. |
+| **`courses`** | **`9`** | `ingest_worker.py` | `_id` (`course_id`) | **Course Catalog & Version Tracker.** Stores 1 summary card per course and records `published_branch` (`ObjectId` from `openedx_ulmo.modulestore.active_versions`). If `published_branch` has not changed since the last sync, the entire course is skipped immediately. |
+| **`sources`** | **`292`** (`275` HTML + `17` PDFs) | `ingest_worker.py` | `idx_sources_course` (`course_id`, `block_id`) | **Unit-Level SHA-256 Delta Tracker.** Stores the `sha256` hash of each raw Open edX HTML block or GridFS PDF (`_id: "{course_id}:{block_id}"`). When a course is republished after editing 1 unit, the 99 unchanged units are skipped (`0` writes, `$0.00` embedding cost). |
+| **`ingest_runs`** | **`25+`** | `ingest_worker.py` | `_id` | **Ingestion Audit & Telemetry Log.** Records a receipt for each sync (`chunks_total`, `chunks_new`, `chunks_changed`, `chunks_unchanged`, `chunks_deleted`, `duration_ms`, and the list of `skipped_non_text_blocks` such as `problem` quizzes and `scorm_v2`). |
+| **`chat_turns`** | Dynamic | `rag_service.py`<br/>`main.py` (`/chat/rate`) | • **`idx_chat_turns_ttl`** (**30-day TTL** on `created_at`)<br/>• `idx_chat_turns_session` (`session_id`, `created_at`) | **Learner Q&A History & GDPR/UN Auto-Expiry.** Stores each learner question, grounded answer, `[S1]`/`[S2]` citations, and thumbs-up/down rating. Loads the last 3 turns for follow-up context and **auto-deletes turns after 30 days** via MongoDB's native TTL index. |
+| **`chat_sessions`** | Dynamic | `rag_service.py` | `idx_chat_sessions_learner` (`learner_id`, `updated_at`) | **Learner Session Header.** Tracks active conversation sessions per `learner_id` (`_id: session_id`, `learner_id`, `created_at`, `updated_at`). |
+| **`benchmark_runs`** | Dynamic | `benchmark_service.py`<br/>`main.py` (`/benchmark/history`) | `idx_benchmark_runs_created_at` (`created_at` desc) | **Saved Benchmark Matrices.** Stores full 5-profile Search & Reranker evaluation matrices (`100%` $\rightarrow$ `90%` $\rightarrow$ `80%` $\rightarrow$ `70%` $\rightarrow$ `30%` Top-1 Accuracy, latency, and cost per 1,000 questions) for the Tab 4 history dropdown. |
 
 ---
 

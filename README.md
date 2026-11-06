@@ -111,13 +111,14 @@ flowchart LR
 | `course-v1:WHOA+H0140EN+2025_Q4` | *Research Ethics Online Training (Part 2)* | 33 | 16 | CIOMS International Ethical Guidelines, ICH E6 (R3) Good Clinical Practice |
 | `course-v1:WHOA+bbt+bbt` | *Building Blocks Course Template* | 16 | 9 | WHO Academy course authoring templates |
 
-### B. Target RAG Database: `poc-who` (`MONGODB_DB_NAME`)
+### B. Target RAG Database: `poc-who` (`MONGODB_DB_NAME` — All 7 Collections)
 
-| Collection | Docs | Key Fields & Purpose |
-| :--- | :---: | :--- |
-| **`courses`** | **9** | Course metadata (`_id`, `title`, `org`, `language`, `version`, `updated_at`). |
-| **`sources`** | **292** | Tracks each Open edX lecture unit and GridFS PDF (`_id`, `course_id`, `unit_title`, `section`, `url`, `sha256`, `status`) so unchanged units and PDFs are skipped during incremental syncs. |
-| **`chunks`** | **397** | **Searchable Knowledge Base (`348` HTML + `49` GridFS PDF chunks).** Stores plain-text chunks (`_id`, `course_id`, `section_title`, `text` with breadcrumb header, `url`, `sha256`, `is_active: true`). Indexed by `chunks_vector` (`autoEmbed` `voyage-4`) and `chunks_text` (`lucene.standard`). |
-| **`ingest_runs`** | **21+** | Audit log of each ingestion sync (`sources_seen`, `sources_changed`, `chunks_upserted`, `chunks_deactivated`). |
-| **`chat_turns`** | Dynamic | Stores learner Q&A turns (`session_id`, `learner_id`, `question`, `rewritten_query`, `answer`, `citations`, `created_at`). Expires automatically after **30 days** via TTL index `idx_chat_turns_ttl`. |
-| **`benchmark_runs`** | Dynamic | Stores model benchmark comparison matrices executed from Tab 3. |
+| Collection in `poc-who` | Docs | Indexes (`db.py`) | Purpose & How It Works |
+| :--- | :---: | :--- | :--- |
+| **`chunks`** | **397** (`348` HTML + `49` PDF) | • `chunks_vector` (`autoEmbed` `voyage-4`)<br/>• `chunks_text` (`lucene.standard`)<br/>• `idx_chunks_course_active` | **The Searchable Knowledge Base.** Stores ~300-word plain-text chunks with `Course > Section > Unit` breadcrumb headers, clickable Open edX/PDF `url`, `sha256`, and `is_active: true`. **No `float[]` vector array in Python** — Atlas `autoEmbed` generates `voyage-4` embeddings automatically. |
+| **`courses`** | **9** | `_id` (`course_id`) | **Course Catalog & Version Tracker.** Stores course metadata and `published_branch` (`ObjectId` from `openedx_ulmo`) so unchanged courses are skipped immediately. |
+| **`sources`** | **292** (`275` HTML + `17` PDFs) | `idx_sources_course` | **Unit-Level SHA-256 Delta Tracker.** Stores the `sha256` hash of each Open edX HTML unit or GridFS PDF so only edited units are re-chunked during incremental syncs (`0` writes on unchanged units). |
+| **`ingest_runs`** | **25+** | `_id` | **Ingestion Audit Log.** Records `chunks_new`, `chunks_unchanged`, `duration_ms`, and `skipped_non_text_blocks` (such as excluded `problem` quiz blocks). |
+| **`chat_turns`** | Dynamic | • `idx_chat_turns_ttl` (**30-day TTL**)<br/>• `idx_chat_turns_session` | **Learner Q&A History & Auto-Expiry.** Stores learner questions, grounded answers, `[S1]`/`[S2]` citations, and thumbs-up/down ratings. **Auto-deleted after 30 days** via MongoDB TTL index. |
+| **`chat_sessions`** | Dynamic | `idx_chat_sessions_learner` | **Learner Session Header.** Tracks active conversation sessions per `learner_id` (`_id: session_id`, `learner_id`, `created_at`, `updated_at`). |
+| **`benchmark_runs`** | Dynamic | `idx_benchmark_runs_created_at` | **Saved Benchmark Matrices.** Stores the 5-profile Search & Reranker comparison runs displayed in Tab 4 (`4. Search & Reranker Benchmark`). |
