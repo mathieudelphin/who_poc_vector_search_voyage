@@ -459,15 +459,19 @@ async def trigger_benchmark_run(req: BenchmarkRunRequest = BenchmarkRunRequest()
 @app.get("/benchmark/history")
 async def get_benchmark_history(limit: int = Query(default=15, ge=1, le=50)) -> Dict[str, Any]:
     """Fetch recent model comparison runs stored in `genai_search.benchmark_runs`."""
-    db = get_db()
-    cursor = db["benchmark_runs"].find({}).sort("created_at", -1).limit(limit)
-    runs: List[Dict[str, Any]] = []
-    async for doc in cursor:
-        doc["benchmark_id"] = str(doc.pop("_id"))
-        if "created_at" in doc and hasattr(doc["created_at"], "isoformat"):
-            doc["created_at"] = doc["created_at"].strftime("%Y-%m-%dT%H:%M:%SZ")
-        runs.append(doc)
-    return {"count": len(runs), "runs": runs}
+    try:
+        db = get_db()
+        cursor = db["benchmark_runs"].find({}).sort("created_at", -1).limit(limit)
+        runs: List[Dict[str, Any]] = []
+        async for doc in cursor:
+            doc["benchmark_id"] = str(doc.pop("_id"))
+            if "created_at" in doc and hasattr(doc["created_at"], "isoformat"):
+                doc["created_at"] = doc["created_at"].strftime("%Y-%m-%dT%H:%M:%SZ")
+            runs.append(doc)
+        return {"count": len(runs), "runs": runs}
+    except Exception as exc:
+        logger.warning("Could not load /benchmark/history from MongoDB Atlas: %s", exc)
+        return {"count": 0, "runs": [], "error": f"MongoDB Atlas connection timeout (check IP Access List / VPN): {exc}"}
 
 
 @app.get("/benchmark/report.md", response_class=PlainTextResponse)
@@ -497,19 +501,30 @@ async def inspect_pipeline_data() -> Dict[str, Any]:
     Return a full X-Ray snapshot of Flow A (Raw Open edX HTML blocks -> Cleaned Chunks in `genai_search.chunks`,
     `courses`, `sources`, `ingest_runs`) so the user can visually trace how WHO lectures are processed.
     """
-    db = get_db()
-    chunks = await db["chunks"].find({}).to_list(length=400)
-    courses = await db["courses"].find({}).to_list(length=50)
-    sources = await db["sources"].find({}).to_list(length=300)
-    ingest_runs = await db["ingest_runs"].find({}, {"_id": 0}).sort("created_at", -1).limit(10).to_list(length=10)
+    try:
+        db = get_db()
+        chunks = await db["chunks"].find({}).to_list(length=400)
+        courses = await db["courses"].find({}).to_list(length=50)
+        sources = await db["sources"].find({}).to_list(length=300)
+        ingest_runs = await db["ingest_runs"].find({}, {"_id": 0}).sort("created_at", -1).limit(10).to_list(length=10)
 
-    return {
-        "seed_courses_raw": SAMPLE_OPEN_EDX_COURSES,
-        "stored_courses": courses,
-        "stored_chunks": chunks,
-        "stored_sources": sources,
-        "recent_ingest_runs": ingest_runs,
-    }
+        return {
+            "seed_courses_raw": SAMPLE_OPEN_EDX_COURSES,
+            "stored_courses": courses,
+            "stored_chunks": chunks,
+            "stored_sources": sources,
+            "recent_ingest_runs": ingest_runs,
+        }
+    except Exception as exc:
+        logger.warning("Could not load /pipeline/inspect from MongoDB Atlas: %s", exc)
+        return {
+            "seed_courses_raw": SAMPLE_OPEN_EDX_COURSES,
+            "stored_courses": [],
+            "stored_chunks": [],
+            "stored_sources": [],
+            "recent_ingest_runs": [],
+            "error": f"MongoDB Atlas connection timeout (check IP Access List / VPN): {exc}",
+        }
 
 
 @app.post("/ingest/preview")

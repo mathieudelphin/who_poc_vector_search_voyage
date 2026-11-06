@@ -48,9 +48,10 @@ Open **[http://127.0.0.1:8000/dashboard](http://127.0.0.1:8000/dashboard)** in y
 ├── requirements.txt         # Python dependencies
 ├── .env.example             # Environment variable template
 └── docs/
-    ├── TECHNICAL_ARCHITECTURE_AND_FAQ.md # Architecture deep-dive, UML flow diagrams, DB schema & FAQ
-    ├── architecture_specification.md     # Detailed technical specification
-    └── benchmark_report.md               # Latest auto-generated Voyage AI model comparison report
+    ├── TECHNICAL_ARCHITECTURE_AND_FAQ.md     # Architecture deep-dive, UML flow diagrams, DB schema & FAQ
+    ├── FUTURE_ROADMAP_SCORM_H5P_VIDEO.md     # What's Next: Best practices for SCORM/H5P, Video & Podcasts
+    ├── architecture_specification.md         # Detailed technical specification
+    └── benchmark_report.md                   # Latest auto-generated Voyage AI model comparison report
 ```
 
 ---
