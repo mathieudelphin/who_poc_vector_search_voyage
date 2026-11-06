@@ -599,6 +599,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </select>
           <select id="xray-mode">
             <option value="hybrid" selected>Mode: Hybrid (Vector + Text)</option>
+            <option value="multimodal_image">Mode: Multimodal Image + Text (voyage-multimodal-3)</option>
             <option value="vector">Mode: Vector Only ($vectorSearch)</option>
             <option value="lexical">Mode: Lexical Only ($search)</option>
           </select>
@@ -611,6 +612,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <span class="preset-pill" onclick="setXrayQuestion('In Basic Emergency Care, what does the SAMPLE history approach stand for after completing the initial ABCDE approach?')">Emergency Care (0006_BEC_EN): ABCDE &amp; SAMPLE History</span>
           <span class="preset-pill" onclick="setXrayQuestion('How is shock defined when poor perfusion prevents oxygen-carrying blood from reaching vital organs, and which age groups are most likely to be affected?')">Emergency Care (0006_BEC_EN): Shock vs Altered Mental Status</span>
           <span class="preset-pill" onclick="setXrayQuestion('Which 2023 WHO operational guidance document supports the Multisectoral Accountability Framework to end TB (MAF-TB)?')">TB Social Protection (HQ_SPTB_EN): MAF-TB 2023 Guidance</span>
+          <span class="preset-pill" onclick="setXrayQuestion('In the Module 3 Unit 5 and Module 4 Unit 3 summaries, what do the TB Treatment chart and the Health in All Policies (HiAP) diagram illustrate?')">HTML Image Diagram (HQ_SPTB_EN): TB Treatment Chart &amp; HiAP Diagram</span>
+          <span class="preset-pill" onclick="setXrayQuestion('What does Principle 1 state in the WHO clinical trials course banner?')">HTML Image Banner (H0118EN): Principle 1 Clinical Trial Banner</span>
           <span class="preset-pill" onclick="setXrayQuestion('Which international ethical guidelines and ICH Good Clinical Practice (GCP) revision are listed in Module 2 resources for protecting participant safety?')">Research Ethics (H0140EN): CIOMS &amp; ICH E6(R3)</span>
           <span class="preset-pill" onclick="setXrayQuestion('According to the GSED Short Form Assessor Competency Checklist PDF, what general skills and tablet preparation steps must an assessor demonstrate?')">PDF Handout (H0117EN GridFS): GSED Competency Checklist PDF</span>
           <span class="preset-pill" onclick="setXrayQuestion('In the Ethical Integration of AI PDF module, what is required before collecting or using digital colposcopy images from data subjects?')">PDF Handout (H0118EN GridFS): Ethical AI &amp; Colposcopy Consent PDF</span>
@@ -707,10 +710,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="split-2col">
           <div>
             <label style="font-size:0.82rem;color:var(--text-muted);display:block;margin-block-end:0.35rem;">
-              Raw Open edX HTML Block (strips HTML tags &amp; splits at <code>&lt;h2&gt;/&lt;h3&gt;</code> headings):
+              Raw Open edX HTML Block (strips HTML tags, splits at <code>&lt;h2&gt;/&lt;h3&gt;</code>, &amp; embeds <code>&lt;img&gt;</code> via <code>voyage-multimodal-3</code>):
             </label>
             <textarea id="sandbox-html">&lt;h3&gt;WHO Surgical Hand Preparation Protocol&lt;/h3&gt;
 &lt;p&gt;Surgical hand antisepsis must be performed either by scrubbing with a suitable antimicrobial soap and water or by using a suitable alcohol-based handrub (ABHR) with sustained activity before donning sterile surgical gloves.&lt;/p&gt;
+&lt;p&gt;&lt;img src="/assets/gridfs/who-5-moments-hand-hygiene-diagram.png" alt="WHO My 5 Moments for Hand Hygiene clinical diagram: 1) Before touching a patient, 2) Before clean/aseptic procedures, 3) After body fluid exposure risk, 4) After touching a patient, 5) After touching patient surroundings." /&gt;&lt;/p&gt;
 &lt;h3&gt;Brushless Technique Recommendation&lt;/h3&gt;
 &lt;p&gt;The WHO strongly discourages the use of brushes for surgical hand preparation because scrubbing with a brush causes skin micro-abrasions and increases bacterial shedding from hands.&lt;/p&gt;</textarea>
           </div>
@@ -857,11 +861,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 </tr>
                 <tr>
                   <td><span class="badge">Full 10 Suite</span></td>
-                  <td><strong>TC10</strong> — Exact Reference Lookup (Lexical Beats Vector)</td>
-                  <td><code>WHOA+HQ_SPTB_EN+2025</code><br/><span style="font-size:0.75rem;color:var(--text-muted);">TB Social Protection</span></td>
-                  <td>Where is Oliosi or e219-e26 listed in the course?</td>
-                  <td><code>HQSPTBEN2025-dfec2da100-c01</code></td>
-                  <td><button class="secondary" style="padding:0.35rem 0.65rem;font-size:0.76rem;" onclick="benchmarkSinglePreset('Where is Oliosi or e219-e26 listed in the course?')">Test 1Q</button></td>
+                  <td><strong>TC10</strong> — Embedded HTML Image Lookup (Requires <code>&lt;img&gt;</code> Extraction)</td>
+                  <td><code>WHOA+HQ_SPTB_EN+2025</code><br/><span style="font-size:0.75rem;color:var(--text-muted);">TB Social Protection (GridFS Image)</span></td>
+                  <td>Where is chart_P4-1080.png or TESTwho-ucn-tb-2023.3_Page_01-1080.png embedded in the course?</td>
+                  <td><code>HQSPTBEN2025-0034dd8e0f-c01</code></td>
+                  <td><button class="secondary" style="padding:0.35rem 0.65rem;font-size:0.76rem;" onclick="benchmarkSinglePreset('Where is chart_P4-1080.png or TESTwho-ucn-tb-2023.3_Page_01-1080.png embedded in the course?')">Test 1Q</button></td>
                 </tr>
               </tbody>
             </table>
@@ -1536,6 +1540,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 if (activeCitations.length > 0) {
                   citBox.innerHTML = activeCitations.map((c, idx) => {
                     const tagCode = (c.tag || '').replace(/[\\[\\]]/g, '');
+                    const imgs = Array.isArray(c.images) ? c.images : [];
+                    const imgsHtml = imgs.length > 0 ? `
+                      <div style="margin-top:0.5rem;padding:0.55rem;background:#eef7fc;border:1px solid #bee0f3;border-radius:0.45rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                          <strong style="font-size:0.76rem;color:var(--accent);">Embedded HTML Diagram${imgs.length > 1 ? 's' : ''} (${imgs.length})</strong>
+                          <span class="score-pill score-high" style="font-size:0.7rem;">Multimodal: ${c.image_embed_model || 'voyage-multimodal-3'} (1024d)</span>
+                        </div>
+                        <div style="display:flex;gap:0.65rem;flex-wrap:wrap;">
+                          ${imgs.map(im => `
+                            <div style="display:flex;gap:0.55rem;align-items:center;background:#ffffff;border:1px solid var(--border);border-radius:0.4rem;padding:0.4rem 0.55rem;max-width:100%;">
+                              <img src="${im.url || im.src}" alt="${(im.alt || im.filename || '').replace(/"/g, '&quot;')}" style="max-width:120px;max-height:72px;object-fit:contain;border-radius:0.25rem;background:#0b192c;" loading="lazy" />
+                              <div style="font-size:0.74rem;line-height:1.35;">
+                                <div><code>${im.filename || 'diagram.png'}</code></div>
+                                <div style="color:var(--text-muted);margin-top:0.15rem;"><strong>alt:</strong> "${im.alt || 'No alt caption'}"</div>
+                              </div>
+                            </div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    ` : '';
                     return `
                       <div class="hit-item" id="source-card-${tagCode}">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
@@ -1547,6 +1571,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div style="font-size:0.76rem;color:var(--accent);margin-top:0.25rem;">
                           Course: <code>${c.course_id || '-'}</code> | Open edX Unit: <code>${c.url}</code>
                         </div>
+                        ${imgsHtml}
                         ${c.text ? `
                           <details ${idx === 0 ? 'open' : ''} style="margin-top:0.45rem;">
                             <summary style="cursor:pointer;font-size:0.78rem;font-weight:600;color:var(--primary);">
@@ -1672,17 +1697,38 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       });
 
       const shown = filtered.slice(0, 60);
+      const totalImgChunks = allInspectorChunks.filter(ch => Array.isArray(ch.images) && ch.images.length > 0).length;
 
       container.innerHTML = `
         <div style="margin-block-end:1rem;font-size:0.86rem;color:var(--text-muted);">
           Showing <strong>${shown.length}</strong> of <strong>${filtered.length}</strong> matching lecture chunks |
           Total Courses: <strong>${allInspectorCourses.length}</strong> |
           Total Plain-Text Chunks (autoEmbed): <strong>${allInspectorChunks.length}</strong> |
+          Multimodal HTML Image Chunks (<code>voyage-multimodal-3</code>): <strong>${totalImgChunks}</strong> |
           Tracked HTML Source Hashes: <strong>${allInspectorSources.length}</strong>
         </div>
         <div class="profile-grid">
           ${shown.map(c => {
             const safeTitle = (c.section_title || '').replace(/'/g, "\\'");
+            const imgs = Array.isArray(c.images) ? c.images : [];
+            const imgsBlock = imgs.length > 0 ? `
+              <div style="margin:0.4rem 0;padding:0.5rem;background:#eef7fc;border:1px solid #bee0f3;border-radius:0.4rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+                  <strong style="font-size:0.74rem;color:var(--accent);">Embedded HTML Image${imgs.length > 1 ? 's' : ''} (${imgs.length})</strong>
+                  <span class="score-pill score-high" style="font-size:0.68rem;">${c.image_embed_model || 'voyage-multimodal-3'} (${c.image_embedding_dims || 1024}d)</span>
+                </div>
+                ${imgs.map(im => `
+                  <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.3rem;background:#fff;padding:0.35rem;border-radius:0.35rem;border:1px solid var(--border);">
+                    <img src="${im.url || im.src}" alt="${(im.alt || im.filename || '').replace(/"/g, '&quot;')}" style="max-width:96px;max-height:56px;object-fit:contain;border-radius:0.2rem;background:#0b192c;" loading="lazy" />
+                    <div style="font-size:0.72rem;line-height:1.3;">
+                      <div><code>${im.filename || ''}</code></div>
+                      <div style="color:var(--text-muted);">alt: "${im.alt || ''}"</div>
+                    </div>
+                  </div>
+                `).join('')}
+                ${c.image_embedding_preview ? `<div style="font-size:0.69rem;color:var(--text-muted);margin-top:0.3rem;"><code>image_embedding[0..4]</code>: <code>[${c.image_embedding_preview.join(', ')}, ...]</code></div>` : ''}
+              </div>
+            ` : '';
             return `
             <div class="profile-box pass">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
@@ -1696,6 +1742,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <span>SHA-256: <code>${(c.sha256 || '').slice(0, 12)}...</code></span>
                 <button class="secondary" style="padding:0.22rem 0.55rem;font-size:0.74rem;" onclick="askAboutLecture('${safeTitle}')">Ask Assistant About This Lecture &rarr;</button>
               </div>
+              ${imgsBlock}
               <pre class="code-box" style="max-block-size:210px;overflow-y:auto;">${c.text}</pre>
             </div>
           `}).join('')}

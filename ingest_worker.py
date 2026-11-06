@@ -9,19 +9,29 @@ Implements the 7-step ingestion flow for Open edX courses into MongoDB Atlas (`g
 """
 
 import asyncio
+import base64
 import hashlib
 import io
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote
 
+import httpx
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pypdf import PdfReader
 
-from db import ensure_indexes, get_db, get_modulestore_db
+from db import VOYAGE_MULTIMODAL_MODEL, ensure_indexes, get_db, get_modulestore_db
+
+load_dotenv()
+
+VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
+VOYAGE_BASE_URL = os.getenv("VOYAGE_BASE_URL", "https://ai.mongodb.com/v1").rstrip("/")
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +103,7 @@ SAMPLE_OPEN_EDX_COURSES: List[Dict[str, Any]] = [
                         <li><strong>Moment 4 — After touching a patient:</strong> Clean your hands when leaving the patient's side after touching the patient and their immediate surroundings.</li>
                         <li><strong>Moment 5 — After touching patient surroundings:</strong> Clean your hands after touching any object or furniture in the patient's immediate surroundings when leaving—even if the patient was not touched.</li>
                     </ul>
+                    <p><img src="/assets/gridfs/who-5-moments-hand-hygiene-diagram.png" alt="WHO My 5 Moments for Hand Hygiene clinical diagram showing the 5 critical hand hygiene indications around the patient zone" /></p>
                 """,
             },
             {
@@ -242,10 +253,154 @@ def compute_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def clean_html_preserving_headings(raw_html: str) -> List[Dict[str, str]]:
+# Decorative UI banners/icons in Open edX HTML blocks that should not be indexed as clinical figures
+DECORATIVE_IMAGE_SUBSTRINGS = (
+    "page_band",
+    "sskxupct50cjbklx",
+    "icon-",
+    "back-next-arrows",
+    "previous-next-buttons",
+    "next_prev",
+    "course-banner",
+    "character_standing",
+    "topic1_intro_img",
+    "topic2_intro_img",
+    "topic3_intro_img",
+    "topic4_intro_img",
+    "topic5_intro_img",
+)
+
+GENERIC_ALT_STRINGS = {
+    "",
+    "image",
+    "more",
+    "icon",
+    "decorative item",
+    "decorative items",
+    "card image 1",
+    "card image 2",
+    "card image 3",
+    "card image 4",
+    "card image 5",
+}
+
+KNOWN_CLINICAL_DIAGRAM_FILES = (
+    "chart_p4",
+    "hiap-diagram",
+    "testwho-ucn-tb",
+    "9789240067530",
+    "principle_banner_",
+    "m01_cover_page",
+    "cover_page_m02",
+    "module_cover_page",
+    "m04_cover_page",
+    "module9_cover_page",
+    "who-5-moments",
+)
+
+# Compact 1x1 PNG fallback data URI used when embedding seed/sandbox HTML images without GridFS binary
+SEED_DIAGRAM_PNG_DATA_URI = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+
+def extract_html_images_from_raw_html(
+    raw_html: str,
+    gridfs_image_map: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Extract substantive clinical diagrams, charts, and figure `<img>` tags from an Open edX HTML block,
+    skipping purely decorative UI dividers/icons and resolving matching GridFS asset IDs.
+    """
+    if not raw_html or "<img" not in raw_html.lower():
+        return []
+
+    soup = BeautifulSoup(raw_html, "html.parser")
+    extracted: List[Dict[str, Any]] = []
+    seen_keys = set()
+
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").strip()
+        alt = re.sub(r"\s+", " ", (img.get("alt") or img.get("title") or "").strip())
+        alt_lower = alt.lower()
+
+        if src.startswith("data:image/"):
+            if alt_lower in GENERIC_ALT_STRINGS:
+                continue
+            fname = "inline_base64_image.png"
+            dedup_key = f"data:{alt_lower}"
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+            extracted.append(
+                {
+                    "filename": fname,
+                    "alt": alt,
+                    "src": src[:64] + "...",
+                    "url": src,
+                    "gridfs_id": None,
+                    "thumbnail_gridfs_id": None,
+                    "content_type": src.split(";")[0].replace("data:", "") or "image/png",
+                }
+            )
+            continue
+
+        filename = unquote(src.split("?")[0].split("@")[-1].split("/")[-1]).strip()
+        fname_lower = filename.lower()
+        if not filename or fname_lower.endswith(".svg"):
+            continue
+        if any(pat in fname_lower for pat in DECORATIVE_IMAGE_SUBSTRINGS):
+            continue
+
+        is_known_diagram = any(k in fname_lower for k in KNOWN_CLINICAL_DIAGRAM_FILES)
+        if alt_lower in GENERIC_ALT_STRINGS and not is_known_diagram:
+            continue
+
+        dedup_key = fname_lower or alt_lower
+        if dedup_key in seen_keys:
+            continue
+        seen_keys.add(dedup_key)
+
+        g_info = (gridfs_image_map or {}).get(filename) or (gridfs_image_map or {}).get(fname_lower) or {}
+        gridfs_id = g_info.get("gridfs_id")
+        thumb_id = g_info.get("thumbnail_gridfs_id")
+        content_type = g_info.get("content_type") or ("image/jpeg" if fname_lower.endswith((".jpg", ".jpeg")) else "image/png")
+
+        if gridfs_id:
+            asset_url = f"/assets/gridfs/{gridfs_id}"
+        elif src.startswith("/assets/gridfs/"):
+            asset_url = src
+        elif src.startswith("http"):
+            asset_url = src
+        else:
+            asset_url = f"/assets/gridfs/{filename}"
+
+        effective_alt = alt if alt_lower not in GENERIC_ALT_STRINGS else filename.replace("_", " ").rsplit(".", 1)[0]
+        extracted.append(
+            {
+                "filename": filename,
+                "alt": effective_alt,
+                "src": src,
+                "url": asset_url,
+                "gridfs_id": str(gridfs_id) if gridfs_id else None,
+                "thumbnail_gridfs_id": str(thumb_id) if thumb_id else None,
+                "content_type": content_type,
+            }
+        )
+
+    return extracted
+
+
+def clean_html_preserving_headings(
+    raw_html: str,
+    gridfs_image_map: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> List[Dict[str, str]]:
     """
     Step A3 & A4: Strip HTML tags (`<h3>`, `<p>`, `<strong>`, `<ul>`, `<li>`) and inline CSS blocks
     while splitting content into logical sections at `<h1>`/`<h2>`/`<h3>`/`<h4>` headings.
+    Preserves substantive `<img alt="..." src="...">` clinical diagrams as inline `[Embedded HTML Image ...]`
+    markers so both image-only HTML blocks (e.g. `H0118EN` Principles 1-5) and inline clinical charts are indexed.
     Returns a list of `{"heading": str | None, "body": str}` segments.
     """
     soup = BeautifulSoup(raw_html, "html.parser")
@@ -253,6 +408,21 @@ def clean_html_preserving_headings(raw_html: str) -> List[Dict[str, str]]:
     # Remove script/style/svg/noscript tags if any
     for tag in soup(["script", "style", "svg", "noscript"]):
         tag.decompose()
+
+    # Convert substantive HTML <img> tags into inline text markers before stripping tags
+    valid_imgs = extract_html_images_from_raw_html(raw_html, gridfs_image_map=gridfs_image_map)
+    valid_by_fname = {im["filename"].lower(): im for im in valid_imgs}
+    for img_tag in soup.find_all("img"):
+        src = (img_tag.get("src") or "").strip()
+        alt = re.sub(r"\s+", " ", (img_tag.get("alt") or img_tag.get("title") or "").strip())
+        fname = "inline_base64_image.png" if src.startswith("data:image/") else unquote(src.split("?")[0].split("@")[-1].split("/")[-1]).strip()
+        matched = valid_by_fname.get(fname.lower())
+        if matched:
+            marker = f" [Embedded HTML Image ({matched['filename']}): {matched['alt']}] "
+            img_tag.replace_with(marker)
+        elif alt and alt.lower() not in GENERIC_ALT_STRINGS and not any(p in fname.lower() for p in DECORATIVE_IMAGE_SUBSTRINGS):
+            marker = f" [Embedded HTML Image ({fname or 'diagram'}): {alt}] "
+            img_tag.replace_with(marker)
 
     segments: List[Dict[str, str]] = []
     current_heading: Optional[str] = None
@@ -306,24 +476,107 @@ def clean_html_preserving_headings(raw_html: str) -> List[Dict[str, str]]:
     return segments
 
 
+async def embed_chunk_images_multimodal(
+    chunk_doc: Dict[str, Any],
+    modulestore_db: Optional[AsyncIOMotorDatabase] = None,
+) -> Optional[List[float]]:
+    """
+    Generate a 1024-dimension multimodal vector (`image_embedding`) for a chunk containing HTML `<img>` diagrams
+    by calling Voyage AI `voyage-multimodal-3` (`POST {VOYAGE_BASE_URL}/multimodalembeddings`) on the interleaved
+    chunk text + binary image bytes from Open edX GridFS (`openedx_ulmo.fs.chunks`).
+    """
+    images = chunk_doc.get("images") or []
+    if not images or not VOYAGE_API_KEY or VOYAGE_API_KEY.startswith("pa-your-"):
+        return None
+
+    content_items: List[Dict[str, str]] = [
+        {"type": "text", "text": chunk_doc.get("text", "")[:2000]}
+    ]
+
+    # Attach the primary diagram binary from GridFS (preferring thumbnail if full PNG > 450 KB for fast upload)
+    primary_img = images[0]
+    data_uri: Optional[str] = None
+
+    raw_url = primary_img.get("url") or ""
+    if raw_url.startswith("data:image/"):
+        data_uri = raw_url
+    elif modulestore_db is not None:
+        target_fid = primary_img.get("gridfs_id")
+        thumb_fid = primary_img.get("thumbnail_gridfs_id")
+        chosen_fid = target_fid
+        chosen_mime = primary_img.get("content_type") or "image/png"
+        try:
+            if target_fid:
+                fdoc = await modulestore_db["fs.files"].find_one({"_id": target_fid}, {"length": 1, "contentType": 1})
+                if fdoc and fdoc.get("length", 0) > 450_000 and thumb_fid:
+                    chosen_fid = thumb_fid
+                    chosen_mime = "image/jpeg"
+                elif fdoc and fdoc.get("contentType"):
+                    chosen_mime = fdoc["contentType"]
+            if chosen_fid:
+                c_cursor = modulestore_db["fs.chunks"].find({"files_id": chosen_fid}).sort("n", 1)
+                raw_chunks = await c_cursor.to_list(150)
+                raw_bytes = b"".join(c.get("data", b"") for c in raw_chunks)
+                if raw_bytes:
+                    b64_str = base64.b64encode(raw_bytes).decode("ascii")
+                    data_uri = f"data:{chosen_mime};base64,{b64_str}"
+        except Exception as exc:
+            logger.warning("Could not load GridFS image bytes for %s (%s)", chosen_fid, exc)
+
+    if not data_uri:
+        data_uri = SEED_DIAGRAM_PNG_DATA_URI
+
+    content_items.append({"type": "image_base64", "image_base64": data_uri})
+
+    try:
+        async with httpx.AsyncClient(timeout=25.0) as http_client:
+            resp = await http_client.post(
+                f"{VOYAGE_BASE_URL}/multimodalembeddings",
+                headers={
+                    "Authorization": f"Bearer {VOYAGE_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": VOYAGE_MULTIMODAL_MODEL,
+                    "inputs": [{"content": content_items}],
+                    "input_type": "document",
+                },
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            vec = (body.get("data") or [{}])[0].get("embedding")
+            if isinstance(vec, list) and len(vec) == 1024:
+                return vec
+    except Exception as exc:
+        logger.warning("Voyage multimodal embedding call failed for chunk %s (%s)", chunk_doc.get("_id"), exc)
+
+    return None
+
+
 def build_chunks_for_block(
     course_id: str,
     short_code: str,
     course_title: str,
     block: Dict[str, Any],
     now_iso: str,
+    gridfs_image_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Step A5: Cut into 300-400 token chunks at headings, prepend the course and section
     breadcrumb (`"Course Title > Section > Unit"`), keep short blocks as one chunk,
-    and generate a deterministic `_id` (`IHH2026-u21-c01`) and `sha256` hash.
+    attach extracted HTML `images` metadata, and generate a deterministic `_id` (`IHH2026-u21-c01`) and `sha256` hash.
     """
     unit_code = block["unit_code"]
     section_name = block["section"]
     unit_title = block["unit_title"]
     breadcrumb = f"{course_title} > {section_name} > {unit_title}"
 
-    segments = clean_html_preserving_headings(block["html"])
+    raw_html = block.get("html", "")
+    block_images = block.get("images")
+    if block_images is None:
+        block_images = extract_html_images_from_raw_html(raw_html, gridfs_image_map=gridfs_image_map)
+
+    segments = clean_html_preserving_headings(raw_html, gridfs_image_map=gridfs_image_map)
     chunks: List[Dict[str, Any]] = []
     chunk_idx = 1
 
@@ -335,19 +588,20 @@ def build_chunks_for_block(
         nonlocal chunk_idx
         full_text = f"{breadcrumb}\n{body_text.strip()}"
         chunk_id = f"{short_code}-{unit_code}-c{chunk_idx:02d}"
-        chunks.append(
-            {
-                "_id": chunk_id,
-                "course_id": course_id,
-                "unit_id": block["block_id"],
-                "sha256": compute_sha256(full_text),
-                "text": full_text,
-                "url": block["url"],
-                "section_title": unit_title,
-                "is_active": True,
-                "updated_at": now_iso,
-            }
-        )
+        chunk_doc: Dict[str, Any] = {
+            "_id": chunk_id,
+            "course_id": course_id,
+            "unit_id": block["block_id"],
+            "sha256": compute_sha256(full_text),
+            "text": full_text,
+            "url": block["url"],
+            "section_title": unit_title,
+            "is_active": True,
+            "updated_at": now_iso,
+        }
+        if block_images:
+            chunk_doc["images"] = block_images
+        chunks.append(chunk_doc)
         chunk_idx += 1
 
     for seg in segments:
@@ -393,9 +647,21 @@ async def ingest_course(
 
     # Step A1 & A2: Check if published_branch changed vs `genai_search.courses`
     existing_course = await db["courses"].find_one({"_id": course_id})
+    has_html_img_blocks = any(
+        "<img" in (b.get("html") or "").lower()
+        for b in course_payload.get("blocks", [])
+    )
+    existing_img_embedded_count = (
+        await db["chunks"].count_documents(
+            {"course_id": course_id, "image_embedding": {"$exists": True}}
+        )
+        if has_html_img_blocks
+        else 1
+    )
     if (
         existing_course
         and existing_course.get("published_branch") == published_branch
+        and existing_img_embedded_count > 0
         and not force
     ):
         duration_ms = int((time.perf_counter() - start_time) * 1000)
@@ -410,6 +676,8 @@ async def ingest_course(
     desired_chunks: Dict[str, Dict[str, Any]] = {}
     sources_updated = 0
     skipped_blocks: List[str] = []
+    gridfs_image_map: Dict[str, Dict[str, Any]] = course_payload.get("gridfs_image_map") or {}
+    modulestore_db = get_modulestore_db()
 
     for block in course_payload.get("blocks", []):
         b_type = block.get("block_type", "html").lower()
@@ -446,6 +714,7 @@ async def ingest_course(
             course_title=course_title,
             block=block,
             now_iso=now_iso,
+            gridfs_image_map=gridfs_image_map,
         )
         for ch in block_chunks:
             desired_chunks[ch["_id"]] = ch
@@ -453,24 +722,54 @@ async def ingest_course(
     # Step A6: Delta Write to Atlas (`genai_search.chunks`)
     existing_chunks_cursor = db["chunks"].find(
         {"course_id": course_id},
-        {"_id": 1, "sha256": 1},
+        {"_id": 1, "sha256": 1, "image_embedding": 1, "image_embed_model": 1},
     )
-    existing_chunks_map: Dict[str, str] = {
-        doc["_id"]: doc.get("sha256", "")
+    existing_chunks_docs: Dict[str, Dict[str, Any]] = {
+        doc["_id"]: doc
         async for doc in existing_chunks_cursor
+    }
+    existing_chunks_map: Dict[str, str] = {
+        cid: doc.get("sha256", "")
+        for cid, doc in existing_chunks_docs.items()
     }
 
     chunks_new = 0
     chunks_changed = 0
     chunks_unchanged = 0
     chunks_deleted = 0
+    chunks_with_images = 0
 
     # Upsert only new or changed chunks (Atlas autoEmbed triggers automatically on text changes!)
+    # For chunks containing substantive HTML `images`, also compute or preserve `image_embedding` (1024d voyage-multimodal-3).
     for chunk_id, chunk_doc in desired_chunks.items():
+        has_images = bool(chunk_doc.get("images"))
+        if has_images:
+            chunks_with_images += 1
+
+        prev_doc = existing_chunks_docs.get(chunk_id)
+        prev_vec = prev_doc.get("image_embedding") if prev_doc else None
+        needs_multimodal_embed = has_images and (
+            not prev_doc
+            or existing_chunks_map.get(chunk_id) != chunk_doc["sha256"]
+            or not prev_vec
+        )
+
+        if needs_multimodal_embed:
+            mm_vec = await embed_chunk_images_multimodal(
+                chunk_doc,
+                modulestore_db=modulestore_db,
+            )
+            if mm_vec:
+                chunk_doc["image_embedding"] = mm_vec
+                chunk_doc["image_embed_model"] = VOYAGE_MULTIMODAL_MODEL
+        elif has_images and prev_vec:
+            chunk_doc["image_embedding"] = prev_vec
+            chunk_doc["image_embed_model"] = prev_doc.get("image_embed_model", VOYAGE_MULTIMODAL_MODEL)
+
         if chunk_id not in existing_chunks_map:
             await db["chunks"].replace_one({"_id": chunk_id}, chunk_doc, upsert=True)
             chunks_new += 1
-        elif existing_chunks_map[chunk_id] != chunk_doc["sha256"]:
+        elif existing_chunks_map[chunk_id] != chunk_doc["sha256"] or needs_multimodal_embed:
             await db["chunks"].replace_one({"_id": chunk_id}, chunk_doc, upsert=True)
             chunks_changed += 1
         else:
@@ -507,6 +806,7 @@ async def ingest_course(
         "chunks_changed": chunks_changed,
         "chunks_unchanged": chunks_unchanged,
         "chunks_deleted": chunks_deleted,
+        "chunks_with_images": chunks_with_images,
         "sources_updated": sources_updated,
         "skipped_non_text_blocks": skipped_blocks,
         "duration_ms": duration_ms,
@@ -655,6 +955,44 @@ async def extract_course_payload_from_modulestore(
     )
     extracted_blocks.extend(pdf_blocks)
 
+    # Build GridFS image lookup map (`openedx_ulmo.fs.files`) for HTML `<img>` asset resolution
+    gridfs_image_map: Dict[str, Dict[str, Any]] = {}
+    try:
+        img_cursor = modulestore_db["fs.files"].find(
+            {
+                "contentType": {"$regex": "^image/"},
+                "content_son.org": org,
+                "content_son.course": course_num,
+                "content_son.run": run,
+            },
+            {"_id": 1, "contentType": 1, "content_son": 1},
+        )
+        img_docs = await img_cursor.to_list(1000)
+        assets_by_name: Dict[str, Dict[str, Any]] = {}
+        thumbs_by_stem: Dict[str, str] = {}
+        for idoc in img_docs:
+            fid = str(idoc["_id"])
+            cson = idoc.get("content_son") or {}
+            fname = str(cson.get("name") or fid.split("@")[-1])
+            ctype = str(idoc.get("contentType") or "image/png")
+            cat = str(cson.get("category") or "asset")
+            if cat == "thumbnail":
+                stem = re.sub(r"-jpeg-\d+x\d+\.jpg$", "", fname, flags=re.IGNORECASE)
+                thumbs_by_stem[stem.lower()] = fid
+            else:
+                assets_by_name[fname] = {
+                    "gridfs_id": fid,
+                    "content_type": ctype,
+                }
+        for fname, meta in assets_by_name.items():
+            stem_key = fname.rsplit(".", 1)[0].lower()
+            if stem_key in thumbs_by_stem:
+                meta["thumbnail_gridfs_id"] = thumbs_by_stem[stem_key]
+            gridfs_image_map[fname] = meta
+            gridfs_image_map[fname.lower()] = meta
+    except Exception as exc:
+        logger.warning("Could not build GridFS image map for %s (%s)", course_id, exc)
+
     return {
         "course_id": course_id,
         "short_code": short_code,
@@ -662,6 +1000,7 @@ async def extract_course_payload_from_modulestore(
         "published_branch": str(pub_branch_oid),
         "about_html": about_html,
         "blocks": extracted_blocks,
+        "gridfs_image_map": gridfs_image_map,
         "source_database": "openedx_ulmo",
     }
 

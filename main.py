@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Union
 from bson import ObjectId
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -24,6 +24,7 @@ from db import (
     MONGODB_DB_NAME,
     OPENEDX_MODULESTORE_DB_NAME,
     VOYAGE_EMBED_MODEL,
+    VOYAGE_MULTIMODAL_MODEL,
     ensure_indexes,
     get_db,
     get_modulestore_db,
@@ -33,6 +34,7 @@ from ingest_worker import (
     build_chunks_for_block,
     clean_html_preserving_headings,
     compute_sha256,
+    embed_chunk_images_multimodal,
     ingest_course,
     run_all_seed_ingestions,
 )
@@ -495,6 +497,55 @@ async def serve_benchmark_dashboard() -> HTMLResponse:
     return HTMLResponse(content=DASHBOARD_HTML)
 
 
+@app.get("/assets/gridfs/{file_id:path}")
+async def serve_gridfs_asset(file_id: str) -> Response:
+    """
+    Serve embedded course images (`image/png`, `image/jpeg`) directly from Open edX
+    MongoContentStore GridFS (`openedx_ulmo.fs.files` + `fs.chunks`) or built-in clinical SVG diagram.
+    """
+    from urllib.parse import unquote
+
+    decoded_id = unquote(file_id).strip("/")
+    if decoded_id == "who-5-moments-hand-hygiene-diagram.png":
+        svg_diagram = """<svg xmlns="http://www.w3.org/2000/svg" width="560" height="220" viewBox="0 0 560 220">
+  <rect width="560" height="220" rx="12" fill="#0B192C"/>
+  <rect x="12" y="12" width="536" height="196" rx="8" fill="#112240" stroke="#00ED64" stroke-width="1.5"/>
+  <text x="28" y="42" fill="#00ED64" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="700">WHO CLINICAL DIAGRAM — MY 5 MOMENTS FOR HAND HYGIENE</text>
+  <text x="28" y="68" fill="#E2E8F0" font-family="Inter,Arial,sans-serif" font-size="12">1. Before touching a patient   |   2. Before clean/aseptic procedures</text>
+  <text x="28" y="92" fill="#E2E8F0" font-family="Inter,Arial,sans-serif" font-size="12">3. After body fluid exposure risk   |   4. After touching a patient</text>
+  <text x="28" y="116" fill="#E2E8F0" font-family="Inter,Arial,sans-serif" font-size="12">5. After touching patient surroundings (20–30s ABHR or 40–60s soap &amp; water)</text>
+  <rect x="28" y="138" width="504" height="52" rx="6" fill="#0F172A" stroke="#38BDF8" stroke-width="1"/>
+  <text x="42" y="160" fill="#38BDF8" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700">Multimodal Vector Index: chunks_image_vector (voyage-multimodal-3, 1024 dims)</text>
+  <text x="42" y="178" fill="#94A3B8" font-family="Inter,Arial,sans-serif" font-size="11">Embedded jointly from Open edX HTML &lt;img&gt; binary + clinical caption</text>
+</svg>"""
+        return Response(content=svg_diagram.encode("utf-8"), media_type="image/svg+xml")
+
+    try:
+        mod_db = get_modulestore_db()
+        file_doc = await mod_db["fs.files"].find_one({"_id": decoded_id})
+        if not file_doc:
+            # Fallback: lookup by filename in `content_son.name`
+            fname = decoded_id.split("@")[-1].split("/")[-1]
+            file_doc = await mod_db["fs.files"].find_one({"content_son.name": fname})
+        if not file_doc:
+            raise HTTPException(status_code=404, detail=f"GridFS asset not found: {decoded_id}")
+
+        actual_id = file_doc["_id"]
+        content_type = file_doc.get("contentType") or "image/png"
+        chunks_cursor = mod_db["fs.chunks"].find({"files_id": actual_id}).sort("n", 1)
+        raw_chunks = await chunks_cursor.to_list(200)
+        raw_bytes = b"".join(c.get("data", b"") for c in raw_chunks)
+        return Response(
+            content=raw_bytes,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error reading GridFS asset {decoded_id}: {exc}") from exc
+
+
 @app.get("/pipeline/inspect")
 async def inspect_pipeline_data() -> Dict[str, Any]:
     """
@@ -503,7 +554,14 @@ async def inspect_pipeline_data() -> Dict[str, Any]:
     """
     try:
         db = get_db()
-        chunks = await db["chunks"].find({}).to_list(length=400)
+        raw_chunks = await db["chunks"].find({}).to_list(length=400)
+        chunks: List[Dict[str, Any]] = []
+        for ch in raw_chunks:
+            vec = ch.pop("image_embedding", None)
+            if isinstance(vec, list) and vec:
+                ch["image_embedding_dims"] = len(vec)
+                ch["image_embedding_preview"] = [round(float(x), 5) for x in vec[:5]]
+            chunks.append(ch)
         courses = await db["courses"].find({}).to_list(length=50)
         sources = await db["sources"].find({}).to_list(length=300)
         ingest_runs = await db["ingest_runs"].find({}, {"_id": 0}).sort("created_at", -1).limit(10).to_list(length=10)
@@ -532,7 +590,8 @@ async def preview_or_ingest_custom_lecture(req: IngestPreviewRequest) -> Dict[st
     """
     Interactive Flow A Sandbox: Takes raw Open edX lecture HTML, runs Step A3/A4 (HTML tag cleaning &
     heading segmentation) and Step A5 (breadcrumb injection, 300-400 token chunking, deterministic `_id`,
-    and `sha256` hash), and optionally writes the chunks into `genai_search.chunks`.
+    `sha256` hash, and multimodal HTML `<img>` embedding via `voyage-multimodal-3`), and optionally writes
+    the chunks into `genai_search.chunks`.
     """
     from datetime import datetime, timezone
 
@@ -555,17 +614,32 @@ async def preview_or_ingest_custom_lecture(req: IngestPreviewRequest) -> Dict[st
         now_iso=now_iso,
     )
 
+    mod_db = get_modulestore_db()
     upserted = 0
-    if req.ingest_to_atlas:
-        db = get_db()
-        for ch in generated_chunks:
-            await db["chunks"].replace_one({"_id": ch["_id"]}, ch, upsert=True)
+    preview_chunks: List[Dict[str, Any]] = []
+    db = get_db() if req.ingest_to_atlas else None
+
+    for ch in generated_chunks:
+        if ch.get("images"):
+            mm_vec = await embed_chunk_images_multimodal(ch, modulestore_db=mod_db)
+            if mm_vec:
+                ch["image_embedding"] = mm_vec
+                ch["image_embed_model"] = VOYAGE_MULTIMODAL_MODEL
+        if req.ingest_to_atlas and db is not None:
+            await db["chunks"].replace_one({"_id": ch["_id"]}, dict(ch), upsert=True)
             upserted += 1
+
+        ch_display = dict(ch)
+        vec = ch_display.pop("image_embedding", None)
+        if isinstance(vec, list) and vec:
+            ch_display["image_embedding_dims"] = len(vec)
+            ch_display["image_embedding_preview"] = [round(float(x), 5) for x in vec[:5]]
+        preview_chunks.append(ch_display)
 
     return {
         "raw_html_sha256": compute_sha256(req.raw_html),
         "cleaned_segments": segments,
-        "generated_chunks": generated_chunks,
+        "generated_chunks": preview_chunks,
         "upserted_to_atlas": upserted,
     }
 

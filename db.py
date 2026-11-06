@@ -27,6 +27,7 @@ MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "genai_search")
 OPENEDX_MODULESTORE_DB_NAME = os.getenv("OPENEDX_MODULESTORE_DB_NAME", "openedx_ulmo")
 CHAT_TURNS_TTL_SECONDS = int(os.getenv("CHAT_TURNS_TTL_SECONDS", "7776000"))  # 90 days
 VOYAGE_EMBED_MODEL = os.getenv("VOYAGE_EMBED_MODEL", "voyage-4")
+VOYAGE_MULTIMODAL_MODEL = os.getenv("VOYAGE_MULTIMODAL_MODEL", "voyage-multimodal-3")
 
 _client: AsyncIOMotorClient | None = None
 
@@ -90,6 +91,27 @@ CHUNKS_TEXT_INDEX_DEFINITION: Dict[str, Any] = {
             },
         },
     }
+}
+
+# Multimodal Image Vector Search Index on `chunks.image_embedding` (populated via Voyage AI `voyage-multimodal-3`)
+CHUNKS_IMAGE_VECTOR_INDEX_NAME = "chunks_image_vector"
+CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION: Dict[str, Any] = {
+    "fields": [
+        {
+            "type": "vector",
+            "path": "image_embedding",
+            "numDimensions": 1024,
+            "similarity": "cosine",
+        },
+        {
+            "type": "filter",
+            "path": "course_id",
+        },
+        {
+            "type": "filter",
+            "path": "is_active",
+        },
+    ]
 }
 
 
@@ -213,5 +235,29 @@ async def ensure_indexes(db: AsyncIOMotorDatabase | None = None) -> Dict[str, An
             )
     else:
         results["search_indexes"].append({"name": CHUNKS_TEXT_INDEX_NAME, "status": "already_exists"})
+
+    # 2c. Multimodal Image Vector Search Index (`chunks_image_vector` on `chunks.image_embedding`)
+    if CHUNKS_IMAGE_VECTOR_INDEX_NAME not in existing_names:
+        try:
+            image_vec_model = SearchIndexModel(
+                definition=CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION,
+                name=CHUNKS_IMAGE_VECTOR_INDEX_NAME,
+                type="vectorSearch",
+            )
+            created_img_vec = await chunks_coll.create_search_index(model=image_vec_model)
+            results["search_indexes"].append({"name": created_img_vec, "status": "created"})
+            logger.info("Created Atlas Multimodal Image Vector Search index (voyage-multimodal-3): %s", created_img_vec)
+        except Exception as exc:
+            logger.warning("Could not create `chunks_image_vector` index automatically: %s", exc)
+            results["search_indexes"].append(
+                {
+                    "name": CHUNKS_IMAGE_VECTOR_INDEX_NAME,
+                    "status": "error",
+                    "error": str(exc),
+                    "definition": CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION,
+                }
+            )
+    else:
+        results["search_indexes"].append({"name": CHUNKS_IMAGE_VECTOR_INDEX_NAME, "status": "already_exists"})
 
     return results

@@ -23,7 +23,14 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-from db import CHUNKS_TEXT_INDEX_NAME, CHUNKS_VECTOR_INDEX_NAME, VOYAGE_EMBED_MODEL, get_db
+from db import (
+    CHUNKS_IMAGE_VECTOR_INDEX_NAME,
+    CHUNKS_TEXT_INDEX_NAME,
+    CHUNKS_VECTOR_INDEX_NAME,
+    VOYAGE_EMBED_MODEL,
+    VOYAGE_MULTIMODAL_MODEL,
+    get_db,
+)
 
 load_dotenv()
 
@@ -468,6 +475,8 @@ def build_rank_fusion_pipeline(
                 "text": 1,
                 "url": 1,
                 "section_title": 1,
+                "images": 1,
+                "image_embed_model": 1,
             }
         },
     ]
@@ -501,6 +510,78 @@ def build_vector_only_pipeline(
                 "text": 1,
                 "url": 1,
                 "section_title": 1,
+                "images": 1,
+                "image_embed_model": 1,
+                "retrieval_score": {"$meta": "vectorSearchScore"},
+            }
+        },
+    ]
+
+
+async def embed_multimodal_query(query_text: str) -> Optional[List[float]]:
+    """
+    Embed a natural-language query into the 1024-dimension `voyage-multimodal-3` vector space
+    (`POST {VOYAGE_BASE_URL}/multimodalembeddings` with `input_type: "query"`) to search
+    `chunks_image_vector` (`path: "image_embedding"`).
+    """
+    if not VOYAGE_API_KEY or VOYAGE_API_KEY.startswith("pa-your-"):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http_client:
+            resp = await http_client.post(
+                f"{VOYAGE_BASE_URL}/multimodalembeddings",
+                headers={
+                    "Authorization": f"Bearer {VOYAGE_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": VOYAGE_MULTIMODAL_MODEL,
+                    "inputs": [{"content": [{"type": "text", "text": query_text}]}],
+                    "input_type": "query",
+                },
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            vec = (body.get("data") or [{}])[0].get("embedding")
+            if isinstance(vec, list) and len(vec) == 1024:
+                return vec
+    except Exception as exc:
+        logger.warning("Voyage multimodal query embedding failed (%s).", exc)
+    return None
+
+
+def build_image_vector_pipeline(
+    query_vector: List[float],
+    enrolled_courses: List[str],
+    candidate_limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Build a `$vectorSearch` pipeline against `chunks_image_vector` (`path: "image_embedding"`, 1024d `voyage-multimodal-3`),
+    strictly pre-filtered by `course_id: {"$in": enrolled_courses}` and `is_active: True`.
+    """
+    return [
+        {
+            "$vectorSearch": {
+                "index": CHUNKS_IMAGE_VECTOR_INDEX_NAME,
+                "path": "image_embedding",
+                "queryVector": query_vector,
+                "numCandidates": 100,
+                "limit": candidate_limit,
+                "filter": {
+                    "course_id": {"$in": enrolled_courses},
+                    "is_active": True,
+                },
+            }
+        },
+        {
+            "$project": {
+                "_id": 1,
+                "course_id": 1,
+                "text": 1,
+                "url": 1,
+                "section_title": 1,
+                "images": 1,
+                "image_embed_model": 1,
                 "retrieval_score": {"$meta": "vectorSearchScore"},
             }
         },
@@ -551,6 +632,8 @@ def build_lexical_only_pipeline(
                 "text": 1,
                 "url": 1,
                 "section_title": 1,
+                "images": 1,
+                "image_embed_model": 1,
                 "retrieval_score": {"$meta": "searchScore"},
             }
         },
@@ -601,13 +684,64 @@ async def hybrid_search_chunks(
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
     Step B4: Execute `$rankFusion` (on MongoDB 8.0+) or parallel `$vectorSearch` + `$search` RRF fusion
-    (on MongoDB 7.0) on `chunks`.
+    (on MongoDB 7.0) on `chunks`. Also supports `multimodal_image` mode querying `chunks_image_vector`
+    (`image_embedding` via `voyage-multimodal-3`).
     Preserves the strict `enrolled_courses` and `is_active: True` security pre-filter at every layer.
     """
     if not enrolled_courses:
         return [], "empty_enrollment"
 
     target_embed_model = embed_model or VOYAGE_EMBED_MODEL
+
+    # 0. Multimodal Image + Text Search Mode (`$vectorSearch` on `chunks_image_vector` + RRF with `chunks_text`)
+    if search_mode == "multimodal_image":
+        img_vec_hits: List[Dict[str, Any]] = []
+        lex_hits: List[Dict[str, Any]] = []
+        q_vec = await embed_multimodal_query(rewritten_query)
+        if q_vec:
+            try:
+                img_pipeline = build_image_vector_pipeline(
+                    q_vec, enrolled_courses, candidate_limit=candidate_limit
+                )
+                img_vec_hits = await db["chunks"].aggregate(img_pipeline).to_list(length=candidate_limit)
+            except Exception as exc:
+                logger.info("`chunks_image_vector` `$vectorSearch` not ready yet (%s); falling back to MQL image filter + lexical.", exc)
+
+        if not img_vec_hits:
+            # While `chunks_image_vector` is building on Atlas, include enrolled chunks that carry `images`
+            img_cursor = db["chunks"].find(
+                {
+                    "course_id": {"$in": enrolled_courses},
+                    "is_active": True,
+                    "images.0": {"$exists": True},
+                },
+                {
+                    "_id": 1,
+                    "course_id": 1,
+                    "text": 1,
+                    "url": 1,
+                    "section_title": 1,
+                    "images": 1,
+                    "image_embed_model": 1,
+                },
+            ).limit(candidate_limit)
+            img_vec_hits = await img_cursor.to_list(length=candidate_limit)
+
+        try:
+            lex_pipeline = build_lexical_only_pipeline(
+                rewritten_query, enrolled_courses, candidate_limit=candidate_limit
+            )
+            lex_hits = await db["chunks"].aggregate(lex_pipeline).to_list(length=candidate_limit)
+        except Exception:
+            pass
+
+        if img_vec_hits and lex_hits:
+            merged = merge_rrf_candidates(img_vec_hits, lex_hits, limit=candidate_limit)
+            return merged, f"atlas_multimodal_image_rrf ({VOYAGE_MULTIMODAL_MODEL} + chunks_text)"
+        if img_vec_hits:
+            return img_vec_hits, f"atlas_multimodal_image_vector ({VOYAGE_MULTIMODAL_MODEL})"
+        if lex_hits:
+            return lex_hits, f"atlas_lexical_fallback ({VOYAGE_MULTIMODAL_MODEL})"
 
     # 1. Pure Lexical Search Mode (`$search` on `chunks_text`)
     if search_mode == "lexical":
@@ -711,6 +845,8 @@ async def hybrid_search_chunks(
             "text": 1,
             "url": 1,
             "section_title": 1,
+            "images": 1,
+            "image_embed_model": 1,
         },
     ).limit(40)
     fallback_hits = await fallback_cursor.to_list(length=40)
@@ -884,7 +1020,8 @@ def build_citations_and_context(
     top_chunks: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
-    Label surviving top chunks `[S1]`, `[S2]`, `[S3]` and map each tag to its real course unit URL.
+    Label surviving top chunks `[S1]`, `[S2]`, `[S3]` and map each tag to its real course unit URL
+    (and any embedded HTML `images` / `image_embed_model` metadata).
     """
     citations: List[Dict[str, Any]] = []
     context_blocks: List[str] = []
@@ -900,6 +1037,8 @@ def build_citations_and_context(
                 "url": chunk.get("url", ""),
                 "relevance_score": chunk.get("relevance_score"),
                 "text": chunk.get("text", ""),
+                "images": chunk.get("images", []),
+                "image_embed_model": chunk.get("image_embed_model"),
             }
         )
         context_blocks.append(
