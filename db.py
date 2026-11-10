@@ -95,7 +95,8 @@ CHUNKS_TEXT_INDEX_DEFINITION: Dict[str, Any] = {
 
 # Multimodal Image Vector Search Index on `chunks.image_embedding` (populated via Voyage AI `voyage-multimodal-3`)
 # Note: Voyage AI vectors (`voyage-4` and `voyage-multimodal-3`) are unit-normalized (L2 norm = 1.0),
-# so `dotProduct` is the recommended similarity metric (mathematically identical ranking to cosine, with lower CPU cost).
+# so `dotProduct` is the recommended similarity metric (mathematically identical ranking to cosine, with lower CPU cost),
+# and `scalar` quantization (`float32` -> `int8`) reduces HNSW index RAM usage by ~75% with negligible recall loss.
 CHUNKS_IMAGE_VECTOR_INDEX_NAME = "chunks_image_vector"
 CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION: Dict[str, Any] = {
     "fields": [
@@ -104,6 +105,7 @@ CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION: Dict[str, Any] = {
             "path": "image_embedding",
             "numDimensions": 1024,
             "similarity": "dotProduct",
+            "quantization": "scalar",
         },
         {
             "type": "filter",

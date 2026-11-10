@@ -45,11 +45,12 @@ Instead of splitting text and images into separate collections, we keep **one un
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`chunks_vector`** | `vectorSearch` (`autoEmbed`) | `text` | `voyage-4` | `course_id`, `is_active` | All `411` chunks (managed by Atlas) |
 | **`chunks_text`** | `search` (BM25 lexical) | `text` | `lucene.standard` | `course_id`, `is_active` | All `411` chunks |
-| **`chunks_image_vector`** | `vectorSearch` (`vector`, `1024d`, `dotProduct`) | `image_embedding` | `voyage-multimodal-3` | `course_id`, `is_active` | **Sparse (`20` image chunks only, `<100 KB` RAM)** |
+| **`chunks_image_vector`** | `vectorSearch` (`vector`, `1024d`, `dotProduct`, `scalar`) | `image_embedding` | `voyage-multimodal-3` | `course_id`, `is_active` | **Sparse (`20` image chunks only, `<100 KB` RAM)** |
 
 ```python
 # db.py
-# Voyage AI vectors are unit-normalized (L2 norm = 1.0), so `dotProduct` is recommended over `cosine`
+# Voyage AI vectors are unit-normalized (L2 norm = 1.0), so `dotProduct` is recommended over `cosine`,
+# and `scalar` quantization (`float32` -> `int8`) reduces HNSW index RAM usage by ~75%.
 CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION = {
     "fields": [
         {
@@ -57,6 +58,7 @@ CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION = {
             "path": "image_embedding",
             "numDimensions": 1024,
             "similarity": "dotProduct",
+            "quantization": "scalar",
         },
         {"type": "filter", "path": "course_id"},
         {"type": "filter", "path": "is_active"},
