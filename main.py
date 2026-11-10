@@ -36,6 +36,7 @@ from ingest_worker import (
     compute_sha256,
     embed_chunk_images_multimodal,
     ingest_course,
+    ingest_openedx_course_by_id,
     run_all_seed_ingestions,
 )
 from rag_service import (
@@ -78,6 +79,18 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 class IngestRunRequest(BaseModel):
+    course_id: Optional[str] = Field(
+        default=None,
+        examples=["course-v1:WHOA+H0118EN+Q1_2025"],
+        description=(
+            "Optional single Open edX `course_id` to delta-sync from `openedx_ulmo` "
+            "(used by the MongoDB Atlas Trigger webhook when a course is published)."
+        ),
+    )
+    published_branch: Optional[str] = Field(
+        default=None,
+        description="Optional `versions.published-branch` ObjectId string passed by the Atlas Trigger.",
+    )
     force: bool = Field(
         default=True,
         description="If true, process blocks even if `published_branch` matches existing course card.",
@@ -401,10 +414,19 @@ async def check_pre_demo_status() -> Dict[str, Any]:
 @app.post("/ingest/run")
 async def trigger_ingest_run(req: IngestRunRequest = IngestRunRequest()) -> Dict[str, Any]:
     """
-    Flow A: Ensure MongoDB Atlas Search & Vector Search (`autoEmbed` with `voyage-4`) and TTL indexes,
-    and run the 7-step delta content ingestion pipeline.
+    Flow A: Ensure MongoDB Atlas Search & Vector Search (`autoEmbed` with `voyage-4` + `voyage-multimodal-3`)
+    and TTL indexes, and run the 7-step delta content ingestion pipeline (either for a single `course_id`
+    triggered by the MongoDB Atlas Trigger webhook, a `custom_course`, or all courses).
     """
     db = get_db()
+    if req.course_id:
+        run_report = await ingest_openedx_course_by_id(
+            course_id=req.course_id,
+            db=db,
+            force=req.force,
+        )
+        return {"ingest_runs": [run_report]}
+
     if req.custom_course:
         index_status = await ensure_indexes(db)
         run_report = await ingest_course(req.custom_course, db=db, force=req.force)

@@ -1083,6 +1083,45 @@ async def extract_pdf_blocks_from_gridfs(
     return pdf_blocks
 
 
+async def ingest_openedx_course_by_id(
+    course_id: str,
+    db: Optional[AsyncIOMotorDatabase] = None,
+    force: bool = False,
+) -> Dict[str, Any]:
+    """
+    Delta-sync a single Open edX course (`course-v1:{org}+{course}+{run}`) from `openedx_ulmo`
+    into `poc-who.chunks` (including HTML blocks, GridFS PDFs, and `voyage-multimodal-3` HTML images).
+    Called directly by the MongoDB Atlas Trigger webhook (`POST /ingest/run`).
+    """
+    if db is None:
+        db = get_db()
+
+    clean_id = course_id.replace("course-v1:", "")
+    parts = clean_id.split("+")
+    if len(parts) != 3:
+        raise ValueError(f"Invalid course_id format '{course_id}' (expected 'course-v1:ORG+COURSE+RUN').")
+
+    org, course_num, run = parts[0], parts[1], parts[2]
+    ms_db = get_modulestore_db()
+    av_doc = await ms_db["modulestore.active_versions"].find_one(
+        {"org": org, "course": course_num, "run": run}
+    )
+    if not av_doc:
+        raise ValueError(f"Course '{course_id}' not found in openedx_ulmo.modulestore.active_versions.")
+
+    payload = await extract_course_payload_from_modulestore(av_doc, modulestore_db=ms_db)
+    if not payload or not payload.get("blocks"):
+        return {
+            "course_id": course_id,
+            "status": "no_published_blocks",
+        }
+
+    run_report = await ingest_course(payload, db=db, force=force)
+    run_report["source"] = "openedx_ulmo (Atlas Trigger Webhook)"
+    run_report["course_title"] = payload["title"]
+    return run_report
+
+
 async def run_all_seed_ingestions(
     db: Optional[AsyncIOMotorDatabase] = None,
     force: bool = True,

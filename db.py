@@ -94,6 +94,8 @@ CHUNKS_TEXT_INDEX_DEFINITION: Dict[str, Any] = {
 }
 
 # Multimodal Image Vector Search Index on `chunks.image_embedding` (populated via Voyage AI `voyage-multimodal-3`)
+# Note: Voyage AI vectors (`voyage-4` and `voyage-multimodal-3`) are unit-normalized (L2 norm = 1.0),
+# so `dotProduct` is the recommended similarity metric (mathematically identical ranking to cosine, with lower CPU cost).
 CHUNKS_IMAGE_VECTOR_INDEX_NAME = "chunks_image_vector"
 CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION: Dict[str, Any] = {
     "fields": [
@@ -101,7 +103,7 @@ CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION: Dict[str, Any] = {
             "type": "vector",
             "path": "image_embedding",
             "numDimensions": 1024,
-            "similarity": "cosine",
+            "similarity": "dotProduct",
         },
         {
             "type": "filter",
@@ -258,6 +260,13 @@ async def ensure_indexes(db: AsyncIOMotorDatabase | None = None) -> Dict[str, An
                 }
             )
     else:
-        results["search_indexes"].append({"name": CHUNKS_IMAGE_VECTOR_INDEX_NAME, "status": "already_exists"})
+        try:
+            await chunks_coll.update_search_index(
+                name=CHUNKS_IMAGE_VECTOR_INDEX_NAME,
+                definition=CHUNKS_IMAGE_VECTOR_INDEX_DEFINITION,
+            )
+            results["search_indexes"].append({"name": CHUNKS_IMAGE_VECTOR_INDEX_NAME, "status": "updated_dotProduct"})
+        except Exception:
+            results["search_indexes"].append({"name": CHUNKS_IMAGE_VECTOR_INDEX_NAME, "status": "already_exists"})
 
     return results
